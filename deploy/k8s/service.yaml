@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: tinywebserver-service
+  namespace: tinywebserver
+  labels:
+    app: tinywebserver
+spec:
+  type: NodePort          # 本地/裸金属; 云环境改为 LoadBalancer
+  selector:
+    app: tinywebserver
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80             # Service 端口
+      targetPort: 9006     # 容器端口
+      nodePort: 30080      # 节点端口（30000-32767）

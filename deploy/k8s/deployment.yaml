@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tinywebserver
+  namespace: tinywebserver
+  labels:
+    app: tinywebserver
+spec:
+  replicas: 2                    # 多副本水平扩展
+  selector:
+    matchLabels:
+      app: tinywebserver
+  template:
+    metadata:
+      labels:
+        app: tinywebserver
+    spec:
+      containers:
+        - name: server
+          image: tinywebserver:latest   # 替换为实际 registry 地址
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9006
+              name: http
+          args:
+            - "-p"
+            - "9006"
+            - "-l"
+            - "$(LOG_MODE)"
+            - "-m"
+            - "$(TRIG_MODE)"
+            - "-t"
+            - "$(THREAD_NUM)"
+            - "-s"
+            - "$(SQL_POOL_SIZE)"
+          env:
+            - name: LOG_MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: tinywebserver-config
+                  key: LOG_MODE
+            - name: TRIG_MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: tinywebserver-config
+                  key: TRIG_MODE
+            - name: THREAD_NUM
+              valueFrom:
+                configMapKeyRef:
+                  name: tinywebserver-config
+                  key: THREAD_NUM
+            - name: SQL_POOL_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: tinywebserver-config
+                  key: SQL_POOL_SIZE
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "128Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+          livenessProbe:
+            tcpSocket:
+              port: 9006
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 9006
+            initialDelaySeconds: 3
+            periodSeconds: 5

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tinywebserver-config
+  namespace: tinywebserver
+data:
+  # 服务器启动参数（与 docker CMD 保持一致）
+  SERVER_PORT: "9006"
+  LOG_MODE: "1"        # 0=同步 1=异步
+  TRIG_MODE: "3"       # 3=ET+ET
+  THREAD_NUM: "8"
+  SQL_POOL_SIZE: "8"
+
+  # MySQL 连接信息（非敏感部分）
+  MYSQL_HOST: "mysql-service"
+  MYSQL_PORT: "3306"
+  MYSQL_DATABASE: "qgydb"
