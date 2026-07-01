@@ -1,9 +1,11 @@
 # Compiled binary
 server
 
-# Log output directory
+# Runtime log files (./ServerLog -> YYYY_MM_DD_ServerLog[.N])
 *_ServerLog
-*_ServerLog/
+*_ServerLog.*
+ServerLog
+ServerLog/
 
 # Editor / IDE
 .vscode/
@@ -32,3 +34,4 @@ tools/webbench-1.5/tags
 # Markdown
 /docs/*
 !/docs/ecommerce_api.md
+!/docs/protobuf_contracts.md
