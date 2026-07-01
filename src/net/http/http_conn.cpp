@@ -1,4 +1,5 @@
 #include "src/net/http/http_conn.h"
+#include "src/app/api_gateway.h"
 #include "src/net/http/url_params.h"
 
 #include <arpa/inet.h>
@@ -60,6 +61,14 @@ constexpr std::string_view k404Body    = "The requested file was not found on th
 constexpr std::string_view k500Title   = "Internal Error";
 constexpr std::string_view k500Body    = "There was an unusual problem serving the request file.\n";
 
+HttpMethod to_api_method(HttpConn::Method method) {
+    switch (method) {
+    case HttpConn::Method::Get:  return HttpMethod::Get;
+    case HttpConn::Method::Post: return HttpMethod::Post;
+    default:                    return HttpMethod::Unknown;
+    }
+}
+
 } // namespace
 
 // ============================================================
@@ -69,7 +78,7 @@ constexpr std::string_view k500Body    = "There was an unusual problem serving t
 void HttpConn::init(int sockfd, const sockaddr_in& addr,
                     std::string_view root, int trig_mode, int close_log,
                     std::string_view user, std::string_view passwd,
-                    std::string_view db_name) {
+                    std::string_view db_name, const ApiGateway* api_gateway) {
     sockfd_     = sockfd;
     address_    = addr;
     trig_mode_  = trig_mode;
@@ -78,6 +87,7 @@ void HttpConn::init(int sockfd, const sockaddr_in& addr,
     sql_user_   = std::string(user);
     sql_passwd_ = std::string(passwd);
     sql_name_   = std::string(db_name);
+    api_gateway_ = api_gateway;
 
     // add_fd 调用前先设置 trig_mode_，确保使用正确的触发模式
     add_fd(epoll_fd, sockfd_, /*one_shot=*/true, trig_mode_);
@@ -107,6 +117,7 @@ void HttpConn::reset_state() {
     host_.clear();
     request_body_.clear();
     real_file_.clear();
+    api_response_.clear();
     mmap_file_.release();
 
     improv.store(false, std::memory_order_relaxed);
@@ -337,6 +348,28 @@ HttpConn::UrlAction HttpConn::classify_url(std::string_view seg) {
 }
 
 HttpConn::HttpCode HttpConn::do_request() {
+    if (url_.rfind("/api/", 0) == 0) {
+        if (api_gateway_ == nullptr) {
+            return HttpCode::InternalError;
+        }
+
+        HttpRequest request;
+        request.method = to_api_method(method_);
+        request.path = url_;
+        request.body = request_body_;
+        if (!host_.empty()) request.headers["Host"] = host_;
+
+        auto response = api_gateway_->dispatch(request);
+        if (!response.has_value()) {
+            response = HttpResponse::json(
+                404,
+                "{\"code\":404,\"message\":\"api route not found\",\"data\":null}");
+        }
+
+        api_response_ = response->to_http_string(linger_);
+        return HttpCode::ApiResponse;
+    }
+
     // 找到最后一个 '/' 后面的字符，确定路由动作
     auto last_slash = url_.rfind('/');
     std::string_view seg = (last_slash == std::string::npos)
@@ -482,6 +515,14 @@ bool HttpConn::add_content(std::string_view content) {
 }
 
 bool HttpConn::process_write(HttpCode ret) {
+    if (ret == HttpCode::ApiResponse) {
+        iv_[0].iov_base = api_response_.data();
+        iv_[0].iov_len  = api_response_.size();
+        iv_count_       = 1;
+        bytes_to_send_  = static_cast<int>(api_response_.size());
+        return bytes_to_send_ > 0;
+    }
+
     // FileRequest 单独处理（需要两段 iovec：header + mmap 文件体）
     if (ret == HttpCode::FileRequest) {
         add_status_line(200, k200Title);
@@ -564,16 +605,6 @@ bool HttpConn::write() {
         bytes_sent_    += static_cast<int>(n);
         bytes_to_send_ -= static_cast<int>(n);
 
-        // 部分写入后调整 iovec 指针
-        if (bytes_sent_ >= static_cast<int>(iv_[0].iov_len)) {
-            iv_[0].iov_len  = 0;
-            iv_[1].iov_base = mmap_file_.get() + (bytes_sent_ - write_idx_);
-            iv_[1].iov_len  = static_cast<std::size_t>(bytes_to_send_);
-        } else {
-            iv_[0].iov_base = write_buf_.data() + bytes_sent_;
-            iv_[0].iov_len -= static_cast<std::size_t>(n);
-        }
-
         if (bytes_to_send_ <= 0) {
             mmap_file_.release();
             mod_fd(epoll_fd, sockfd_, EPOLLIN, trig_mode_);
@@ -582,6 +613,16 @@ bool HttpConn::write() {
                 return true;
             }
             return false;
+        }
+
+        // 部分写入后调整 iovec 指针
+        if (bytes_sent_ >= static_cast<int>(iv_[0].iov_len)) {
+            iv_[0].iov_len  = 0;
+            iv_[1].iov_base = mmap_file_.get() + (bytes_sent_ - write_idx_);
+            iv_[1].iov_len  = static_cast<std::size_t>(bytes_to_send_);
+        } else {
+            iv_[0].iov_base = write_buf_.data() + bytes_sent_;
+            iv_[0].iov_len -= static_cast<std::size_t>(n);
         }
     }
 }

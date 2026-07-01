@@ -17,6 +17,8 @@
 #include "src/net/http/mmap_guard.h"
 #include "src/db/user_cache.h"
 
+class ApiGateway;
+
 class HttpConn {
 public:
     static constexpr int kFileNameLen  = 200;
@@ -27,7 +29,7 @@ public:
     enum class CheckState { RequestLine, Header, Content };
     enum class HttpCode   {
         NoRequest, GetRequest, BadRequest, NoResource,
-        ForbiddenRequest, FileRequest, InternalError, ClosedConnection
+        ForbiddenRequest, FileRequest, ApiResponse, InternalError, ClosedConnection
     };
     enum class LineStatus { Ok, Bad, Open };
     enum class UrlAction  {
@@ -61,7 +63,7 @@ public:
     void init(int sockfd, const sockaddr_in& addr,
               std::string_view root, int trig_mode, int close_log,
               std::string_view user, std::string_view passwd,
-              std::string_view db_name);
+              std::string_view db_name, const ApiGateway* api_gateway);
 
     void close_conn(bool real_close = true);
     void process();
@@ -110,6 +112,7 @@ private:
     std::string sql_user_;
     std::string sql_passwd_;
     std::string sql_name_;
+    const ApiGateway* api_gateway_{nullptr};
 
     // ------- 读缓冲 -------
     std::array<char, kReadBufSize> read_buf_{};
@@ -140,6 +143,7 @@ private:
     std::string real_file_;
     struct stat file_stat_{};
     MmapGuard   mmap_file_;
+    std::string api_response_;
 };
 
 // 向后兼容别名 — 已有调用方可继续使用 'http_conn'

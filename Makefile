@@ -1,6 +1,6 @@
 CXX ?= g++
 
-CXXFLAGS += -std=c++17 -Wall -Wextra
+CXXFLAGS += -std=c++17 -Wall -Wextra -I.
 
 DEBUG ?= 1
 ifeq ($(DEBUG), 1)

@@ -31,9 +31,9 @@ WORKDIR /app
 
 # 拷贝编译产物和静态资源
 COPY --from=builder /build/build/server /app/server
-COPY --from=builder /build/static /app/static
+COPY --from=builder /build/client /app/client
 
-# 服务器运行时通过 getcwd()+"/static" 确定文档根目录，
+# 服务器运行时通过 getcwd()+"/client" 确定文档根目录，
 # 因此必须从 /app 目录启动二进制
 WORKDIR /app
 

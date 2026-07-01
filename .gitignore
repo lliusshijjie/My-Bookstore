@@ -2,6 +2,7 @@
 server
 
 # Log output directory
+*_ServerLog
 *_ServerLog/
 
 # Editor / IDE
@@ -27,3 +28,7 @@ core.*
 tools/webbench-1.5/webbench
 tools/webbench-1.5/webbench.o
 tools/webbench-1.5/tags
+
+# Markdown
+/docs/*
+!/docs/ecommerce_api.md
