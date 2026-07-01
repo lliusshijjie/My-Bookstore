@@ -7,7 +7,8 @@
 - `client/`：浏览器端静态页面和资源。
 - `server`：当前 C++ HTTP 服务端，负责静态资源、HTTP API、连接管理和请求分发。
 - `src/net/http/`：HTTP 解析、响应构造和路由基础设施。
-- `src/app/`：API 网关入口，后续承载 controller/service/repository 分层。
+- `src/app/`：API 网关入口，包含 controller、service、repository 接口、内存仓储和 MySQL DAO。
+- `scripts/init.sql`：本地 MySQL 初始化脚本，包含用户、图书、库存、订单和订单明细表。
 - `docs/ecommerce_api.md`：HTTP API 约定和接口规划。
 
 ## 系统上下文
@@ -120,7 +121,7 @@ sequenceDiagram
    建立 `HttpRequest`、`HttpResponse`、`Router`、`API Gateway`，先支持 `/api/health`，再迁移登录注册。
 
 3. **Phase 2：模块化单体业务**
-   在单进程内实现 `UserService`、`BookService`、`InventoryService`、`OrderService`，先跑通完整业务闭环。
+   在单进程内实现 `UserService`、`BookService`、`InventoryService`、`OrderService`，通过 repository 接口保留内存实现并接入 MySQL DAO。
 
 4. **Phase 3：Protobuf 契约**
    新增 `proto/`，定义用户、图书、库存、订单服务接口，为 gRPC 拆分做准备。

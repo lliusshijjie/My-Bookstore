@@ -14,7 +14,11 @@ will not call gRPC directly.
 - Response body: JSON
 - Success shape: `{"code":0,"message":"ok","data":...}`
 - Error shape: `{"code":<number>,"message":"<reason>","data":null}`
-- Phase 2 storage: in-process services with seeded data
+- Phase 2 default storage: in-process memory repositories with seeded data
+- Runtime storage: `WebServer::sql_pool()` switches the API gateway to MySQL
+  DAO repositories after the connection pool is initialized
+- SQL boundary: `UserService`, `BookService`, `InventoryService`, and
+  `OrderService` depend on repository interfaces and do not call the MySQL C API
 
 ## Phase 1 Implemented Endpoint
 
@@ -36,9 +40,11 @@ Response `200 OK`:
 
 ## Phase 2 Implemented Endpoints
 
-Phase 2 runs as a modular monolith. `ApiGateway` owns in-process
-`UserService`, `BookService`, `InventoryService`, and `OrderService` instances.
-MySQL repositories and gRPC service extraction are planned for later phases.
+Phase 2 runs as a modular monolith. `ApiGateway` owns `UserService`,
+`BookService`, `InventoryService`, and `OrderService` instances. Services use
+repository interfaces, so tests can keep memory repositories while the running
+server can use MySQL DAO repositories. Later gRPC services should keep these
+repository boundaries instead of moving SQL into service logic.
 
 ### POST /api/auth/register
 
@@ -148,6 +154,23 @@ invalid.
 ### GET /api/orders
 
 Lists orders currently stored in the monolith order service.
+
+## Database Schema
+
+`scripts/init.sql` creates the local MySQL schema used by Docker Compose:
+
+- `user`: legacy login/register users, retained for the original flow.
+- `books`: book catalog records with title, author, price, stock, and status.
+- `inventory`: one stock row per book, linked by `book_id`.
+- `orders`: order header rows linked to `user.id`.
+- `order_items`: order line rows linked to `orders.id` and `books.id`.
+
+The repository layer has two implementations:
+
+- `src/app/repository/memory/`: default in-memory repositories used by tests and
+  standalone service construction.
+- `src/app/repository/mysql/`: MySQL DAO implementation used by `WebServer`
+  after `connection_pool` is initialized.
 
 ## Planned APIs
 

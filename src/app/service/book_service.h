@@ -1,35 +1,48 @@
 #pragma once
 
 #include "src/app/model/book.h"
+#include "src/app/repository/book_repository.h"
+#include "src/app/repository/memory/memory_repositories.h"
 
+#include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
-#include <optional>
 
 class BookService {
 public:
-    BookService() = default;
-
-    explicit BookService(std::vector<Book> books)
-        : books_(std::move(books))
+    BookService()
+        : repository_(std::make_shared<MemoryBookRepository>())
     {
     }
 
-    const std::vector<Book>& list_books() const
+    explicit BookService(std::vector<Book> books)
+        : repository_(std::make_shared<MemoryBookRepository>(std::move(books)))
     {
-        return books_;
+    }
+
+    explicit BookService(std::shared_ptr<BookRepository> repository)
+        : repository_(std::move(repository))
+    {
+    }
+
+    std::vector<Book> list_books() const
+    {
+        return repository_->list_books();
     }
 
     std::optional<Book> find_book(int book_id) const
     {
-        for (const auto& book : books_) {
-            if (book.id == book_id) return book;
-        }
-        return std::nullopt;
+        return repository_->find_book(book_id);
+    }
+
+    std::shared_ptr<BookRepository> repository() const
+    {
+        return repository_;
     }
 
 private:
-    std::vector<Book> books_;
+    std::shared_ptr<BookRepository> repository_;
 };
 
 inline const BookService& default_book_service()

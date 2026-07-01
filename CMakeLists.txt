@@ -30,6 +30,7 @@ set(SOURCES
     src/core/config.cpp
     src/timer/lst_timer.cpp
     src/net/http/http_conn.cpp
+    src/app/repository/mysql/mysql_repositories.cpp
     src/db/user_cache.cpp
     src/log/log.cpp
     src/db/sql_connection_pool.cpp

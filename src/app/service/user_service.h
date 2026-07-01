@@ -1,36 +1,34 @@
 #pragma once
 
-#include "src/app/model/user.h"
+#include "src/app/repository/memory/memory_repositories.h"
+#include "src/app/repository/user_repository.h"
 
+#include <memory>
 #include <optional>
 #include <string>
-#include <unordered_map>
 
 class UserService {
 public:
+    UserService()
+        : repository_(std::make_shared<MemoryUserRepository>())
+    {
+    }
+
+    explicit UserService(std::shared_ptr<UserRepository> repository)
+        : repository_(std::move(repository))
+    {
+    }
+
     std::optional<User> register_user(const std::string& username, const std::string& password)
     {
-        if (username.empty() || password.empty()) return std::nullopt;
-        if (passwords_.find(username) != passwords_.end()) return std::nullopt;
-
-        User user{next_user_id_++, username};
-        users_by_name_[username] = user;
-        passwords_[username] = password;
-        return user;
+        return repository_->create_user(username, password);
     }
 
     std::optional<User> authenticate(const std::string& username, const std::string& password) const
     {
-        auto pass_it = passwords_.find(username);
-        if (pass_it == passwords_.end() || pass_it->second != password) return std::nullopt;
-
-        auto user_it = users_by_name_.find(username);
-        if (user_it == users_by_name_.end()) return std::nullopt;
-        return user_it->second;
+        return repository_->authenticate(username, password);
     }
 
 private:
-    int next_user_id_{1};
-    std::unordered_map<std::string, User> users_by_name_;
-    std::unordered_map<std::string, std::string> passwords_;
+    std::shared_ptr<UserRepository> repository_;
 };

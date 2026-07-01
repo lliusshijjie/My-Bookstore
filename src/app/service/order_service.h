@@ -1,16 +1,33 @@
 #pragma once
 
 #include "src/app/model/order.h"
+#include "src/app/repository/book_repository.h"
+#include "src/app/repository/inventory_repository.h"
+#include "src/app/repository/memory/memory_repositories.h"
+#include "src/app/repository/order_repository.h"
 #include "src/app/service/book_service.h"
 #include "src/app/service/inventory_service.h"
 
+#include <memory>
 #include <optional>
+#include <utility>
 #include <vector>
 
 class OrderService {
 public:
     OrderService(const BookService& book_service, InventoryService& inventory_service)
-        : book_service_(book_service), inventory_service_(inventory_service)
+        : book_repository_(book_service.repository()),
+          inventory_repository_(inventory_service.repository()),
+          order_repository_(std::make_shared<MemoryOrderRepository>())
+    {
+    }
+
+    OrderService(std::shared_ptr<BookRepository> book_repository,
+                 std::shared_ptr<InventoryRepository> inventory_repository,
+                 std::shared_ptr<OrderRepository> order_repository)
+        : book_repository_(std::move(book_repository)),
+          inventory_repository_(std::move(inventory_repository)),
+          order_repository_(std::move(order_repository))
     {
     }
 
@@ -24,7 +41,7 @@ public:
 
         for (const auto& request : item_requests) {
             if (request.quantity <= 0) return std::nullopt;
-            auto book = book_service_.find_book(request.book_id);
+            auto book = book_repository_->find_book(request.book_id);
             if (!book.has_value()) return std::nullopt;
 
             items.push_back(OrderItem{request.book_id, request.quantity, book->price_cents});
@@ -33,33 +50,31 @@ public:
 
         std::vector<OrderItemRequest> reserved;
         for (const auto& request : item_requests) {
-            if (!inventory_service_.reserve_stock(request.book_id, request.quantity)) {
+            if (!inventory_repository_->reserve_stock(request.book_id, request.quantity)) {
                 for (const auto& item : reserved) {
-                    inventory_service_.release_stock(item.book_id, item.quantity);
+                    inventory_repository_->release_stock(item.book_id, item.quantity);
                 }
                 return std::nullopt;
             }
             reserved.push_back(request);
         }
 
-        Order order;
-        order.id = next_order_id_++;
-        order.user_id = user_id;
-        order.items = std::move(items);
-        order.total_cents = total;
-        order.status = "created";
-        orders_.push_back(order);
+        auto order = order_repository_->create_order(user_id, items, total);
+        if (!order.has_value()) {
+            for (const auto& item : reserved) {
+                inventory_repository_->release_stock(item.book_id, item.quantity);
+            }
+        }
         return order;
     }
 
-    const std::vector<Order>& list_orders() const
+    std::vector<Order> list_orders() const
     {
-        return orders_;
+        return order_repository_->list_orders();
     }
 
 private:
-    const BookService& book_service_;
-    InventoryService& inventory_service_;
-    int next_order_id_{1};
-    std::vector<Order> orders_;
+    std::shared_ptr<BookRepository> book_repository_;
+    std::shared_ptr<InventoryRepository> inventory_repository_;
+    std::shared_ptr<OrderRepository> order_repository_;
 };

@@ -49,7 +49,7 @@ inline HttpResponse handle_list_orders(const HttpRequest&, const OrderService& s
 {
     std::ostringstream out;
     out << "{\"code\":0,\"message\":\"ok\",\"data\":{\"orders\":[";
-    const auto& orders = service.list_orders();
+    auto orders = service.list_orders();
     for (std::size_t i = 0; i < orders.size(); ++i) {
         if (i != 0) out << ",";
         out << order_to_json(orders[i]);

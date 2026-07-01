@@ -49,3 +49,22 @@ add_executable(test_ecommerce_flow test_ecommerce_flow.cpp)
 target_include_directories(test_ecommerce_flow PRIVATE ${TEST_INCLUDE_DIR})
 target_compile_features(test_ecommerce_flow PRIVATE cxx_std_17)
 add_test(NAME ecommerce_flow COMMAND test_ecommerce_flow)
+
+# --- test_database_schema ---
+add_executable(test_database_schema test_database_schema.cpp)
+target_include_directories(test_database_schema PRIVATE ${TEST_INCLUDE_DIR})
+target_compile_features(test_database_schema PRIVATE cxx_std_17)
+add_test(NAME database_schema COMMAND test_database_schema)
+
+# --- test_repository_services ---
+add_executable(test_repository_services test_repository_services.cpp)
+target_include_directories(test_repository_services PRIVATE ${TEST_INCLUDE_DIR})
+target_compile_features(test_repository_services PRIVATE cxx_std_17)
+add_test(NAME repository_services COMMAND test_repository_services)
+
+# --- test_mysql_repository_wiring ---
+add_executable(test_mysql_repository_wiring test_mysql_repository_wiring.cpp)
+target_include_directories(test_mysql_repository_wiring PRIVATE ${TEST_INCLUDE_DIR})
+target_compile_features(test_mysql_repository_wiring PRIVATE cxx_std_17)
+target_link_libraries(test_mysql_repository_wiring PRIVATE mysqlclient)
+add_test(NAME mysql_repository_wiring COMMAND test_mysql_repository_wiring)
