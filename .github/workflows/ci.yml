@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            g++ \
+            libmysqlclient-dev \
+            libgrpc++-dev \
+            pkg-config \
+            protobuf-compiler \
+            protobuf-compiler-grpc
+
+      - name: Configure CMake
+        run: cmake -S . -B ci-build -DBUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build ci-build --parallel
+
+      - name: Run tests
+        env:
+          CTEST_OUTPUT_ON_FAILURE: "1"
+        working-directory: ci-build
+        run: ctest --output-on-failure
