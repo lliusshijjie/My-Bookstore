@@ -21,10 +21,11 @@ ServerLog/
 
 # CMake build directory
 build/
+build-*/
 
 # Core dumps
-core
-core.*
+/core
+/core.*
 
 # tools/ 中的预编译二进制（webbench）
 tools/webbench-1.5/webbench

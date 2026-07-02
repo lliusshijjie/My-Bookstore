@@ -42,10 +42,14 @@ int main()
     assert_contains(sql, "CREATE TABLE IF NOT EXISTS user");
     assert_contains(sql, "CREATE TABLE IF NOT EXISTS books");
     assert_contains(sql, "CREATE TABLE IF NOT EXISTS inventory");
+    assert_contains(sql, "CREATE TABLE IF NOT EXISTS inventory_reservations");
+    assert_contains(sql, "CREATE TABLE IF NOT EXISTS inventory_reservation_items");
     assert_contains(sql, "CREATE TABLE IF NOT EXISTS orders");
     assert_contains(sql, "CREATE TABLE IF NOT EXISTS order_items");
 
     assert_contains(sql, "CONSTRAINT fk_inventory_book");
+    assert_contains(sql, "CONSTRAINT fk_inventory_reservation_items_reservation");
+    assert_contains(sql, "CONSTRAINT fk_inventory_reservation_items_book");
     assert_contains(sql, "CONSTRAINT fk_orders_user");
     assert_contains(sql, "CONSTRAINT fk_order_items_order");
     assert_contains(sql, "CONSTRAINT fk_order_items_book");

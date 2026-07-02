@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -39,6 +40,18 @@ public:
     void release_stock(int book_id, int quantity)
     {
         repository_->release_stock(book_id, quantity);
+    }
+
+    bool reserve_stock(const std::string& reservation_id,
+                       const std::vector<InventoryMutation>& items)
+    {
+        return repository_->reserve_stock(reservation_id, items);
+    }
+
+    void release_stock(const std::string& reservation_id,
+                       const std::vector<InventoryMutation>& items)
+    {
+        repository_->release_stock(reservation_id, items);
     }
 
     std::shared_ptr<InventoryRepository> repository() const

@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package bookstore.inventory.v1;
+
+option cc_enable_arenas = true;
+
+service InventoryService {
+  rpc GetInventory(GetInventoryRequest) returns (GetInventoryResponse);
+  rpc ReserveInventory(ReserveInventoryRequest) returns (ReserveInventoryResponse);
+  rpc ReleaseInventory(ReleaseInventoryRequest) returns (ReleaseInventoryResponse);
+}
+
+message InventoryItem {
+  int64 book_id = 1;
+  int32 available = 2;
+}
+
+message InventoryMutation {
+  int64 book_id = 1;
+  int32 quantity = 2;
+}
+
+message GetInventoryRequest {
+  int64 book_id = 1;
+}
+
+message GetInventoryResponse {
+  InventoryItem item = 1;
+}
+
+message ReserveInventoryRequest {
+  string reservation_id = 1;
+  repeated InventoryMutation items = 2;
+}
+
+message ReserveInventoryResponse {
+  repeated InventoryItem items = 1;
+}
+
+message ReleaseInventoryRequest {
+  string reservation_id = 1;
+  repeated InventoryMutation items = 2;
+}
+
+message ReleaseInventoryResponse {
+  repeated InventoryItem items = 1;
+}

@@ -10,6 +10,11 @@ FROM ubuntu:22.04 AS builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
         g++ cmake make \
         libmysqlclient-dev \
+        libgrpc++-dev \
+        libprotobuf-dev \
+        pkg-config \
+        protobuf-compiler \
+        protobuf-compiler-grpc \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
@@ -25,19 +30,22 @@ FROM ubuntu:22.04 AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libmysqlclient21 \
+        libgrpc++1 \
+        libprotobuf23 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # 拷贝编译产物和静态资源
 COPY --from=builder /build/build/server /app/server
+COPY --from=builder /build/build/inventory_grpc_server /app/inventory_grpc_server
 COPY --from=builder /build/client /app/client
 
 # 服务器运行时通过 getcwd()+"/client" 确定文档根目录，
 # 因此必须从 /app 目录启动二进制
 WORKDIR /app
 
-EXPOSE 9006
+EXPOSE 9006 50051
 
 # 默认启动参数（可被 docker run / k8s args 覆盖）
 # -p 端口  -l 日志模式(0同步/1异步)  -m 触发模式  -t 线程数  -s 连接池大小

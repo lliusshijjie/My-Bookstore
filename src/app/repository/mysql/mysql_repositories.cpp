@@ -213,6 +213,175 @@ void MysqlInventoryRepository::release_stock(int book_id, int quantity)
     mysql_query(mysql, sql.c_str());
 }
 
+bool MysqlInventoryRepository::reserve_stock(const std::string& reservation_id,
+                                             const std::vector<InventoryMutation>& items)
+{
+    if (pool_ == nullptr || reservation_id.empty() || items.empty()) return false;
+    for (const auto& item : items) {
+        if (item.book_id <= 0 || item.quantity <= 0) return false;
+    }
+
+    MYSQL* mysql = nullptr;
+    connectionRAII connection(&mysql, pool_);
+    if (mysql == nullptr) return false;
+
+    const auto escaped_id = escape_sql(mysql, reservation_id);
+    if (mysql_query(mysql, "START TRANSACTION") != 0) return false;
+
+    const std::string find_sql =
+        "SELECT status FROM inventory_reservations WHERE reservation_id='" + escaped_id +
+        "' FOR UPDATE";
+    if (mysql_query(mysql, find_sql.c_str()) != 0) {
+        mysql_query(mysql, "ROLLBACK");
+        return false;
+    }
+
+    auto existing = store_result(mysql);
+    if (!existing) {
+        mysql_query(mysql, "ROLLBACK");
+        return false;
+    }
+    MYSQL_ROW existing_row = mysql_fetch_row(existing.get());
+    if (existing_row != nullptr) {
+        const std::string status = existing_row[0] ? existing_row[0] : "";
+        existing.reset();
+        if (status == "reserved") {
+            mysql_query(mysql, "COMMIT");
+            return true;
+        }
+        mysql_query(mysql, "ROLLBACK");
+        return false;
+    }
+    existing.reset();
+
+    const std::string insert_reservation =
+        "INSERT INTO inventory_reservations(reservation_id,status) VALUES('" + escaped_id +
+        "', 'reserved')";
+    if (mysql_query(mysql, insert_reservation.c_str()) != 0) {
+        mysql_query(mysql, "ROLLBACK");
+        return false;
+    }
+
+    for (const auto& item : items) {
+        const std::string update_stock =
+            "UPDATE inventory SET available=available-" + std::to_string(item.quantity) +
+            " WHERE book_id=" + std::to_string(item.book_id) +
+            " AND available>=" + std::to_string(item.quantity);
+        if (mysql_query(mysql, update_stock.c_str()) != 0 ||
+            mysql_affected_rows(mysql) != 1) {
+            mysql_query(mysql, "ROLLBACK");
+            return false;
+        }
+
+        const std::string insert_item =
+            "INSERT INTO inventory_reservation_items(reservation_id,book_id,quantity) VALUES('" +
+            escaped_id + "', " + std::to_string(item.book_id) + ", " +
+            std::to_string(item.quantity) + ")";
+        if (mysql_query(mysql, insert_item.c_str()) != 0) {
+            mysql_query(mysql, "ROLLBACK");
+            return false;
+        }
+    }
+
+    if (mysql_query(mysql, "COMMIT") != 0) {
+        mysql_query(mysql, "ROLLBACK");
+        return false;
+    }
+    return true;
+}
+
+void MysqlInventoryRepository::release_stock(const std::string& reservation_id,
+                                             const std::vector<InventoryMutation>&)
+{
+    if (pool_ == nullptr || reservation_id.empty()) return;
+
+    MYSQL* mysql = nullptr;
+    connectionRAII connection(&mysql, pool_);
+    if (mysql == nullptr) return;
+
+    const auto escaped_id = escape_sql(mysql, reservation_id);
+    if (mysql_query(mysql, "START TRANSACTION") != 0) return;
+
+    const std::string find_sql =
+        "SELECT status FROM inventory_reservations WHERE reservation_id='" + escaped_id +
+        "' FOR UPDATE";
+    if (mysql_query(mysql, find_sql.c_str()) != 0) {
+        mysql_query(mysql, "ROLLBACK");
+        return;
+    }
+
+    auto existing = store_result(mysql);
+    if (!existing) {
+        mysql_query(mysql, "ROLLBACK");
+        return;
+    }
+    MYSQL_ROW existing_row = mysql_fetch_row(existing.get());
+    if (existing_row == nullptr) {
+        mysql_query(mysql, "ROLLBACK");
+        return;
+    }
+    const std::string status = existing_row[0] ? existing_row[0] : "";
+    existing.reset();
+    if (status == "released") {
+        mysql_query(mysql, "COMMIT");
+        return;
+    }
+    if (status != "reserved") {
+        mysql_query(mysql, "ROLLBACK");
+        return;
+    }
+
+    const std::string items_sql =
+        "SELECT book_id,quantity FROM inventory_reservation_items WHERE reservation_id='" +
+        escaped_id + "'";
+    if (mysql_query(mysql, items_sql.c_str()) != 0) {
+        mysql_query(mysql, "ROLLBACK");
+        return;
+    }
+
+    auto result = store_result(mysql);
+    if (!result) {
+        mysql_query(mysql, "ROLLBACK");
+        return;
+    }
+
+    std::vector<InventoryMutation> reserved_items;
+    MYSQL_ROW row;
+    while ((row = mysql_fetch_row(result.get())) != nullptr) {
+        reserved_items.push_back(InventoryMutation{
+            row[0] ? std::atoi(row[0]) : 0,
+            row[1] ? std::atoi(row[1]) : 0,
+        });
+    }
+    result.reset();
+
+    for (const auto& item : reserved_items) {
+        if (item.book_id <= 0 || item.quantity <= 0) {
+            mysql_query(mysql, "ROLLBACK");
+            return;
+        }
+        const std::string update_stock =
+            "UPDATE inventory SET available=available+" + std::to_string(item.quantity) +
+            " WHERE book_id=" + std::to_string(item.book_id);
+        if (mysql_query(mysql, update_stock.c_str()) != 0) {
+            mysql_query(mysql, "ROLLBACK");
+            return;
+        }
+    }
+
+    const std::string release_sql =
+        "UPDATE inventory_reservations SET status='released' WHERE reservation_id='" +
+        escaped_id + "'";
+    if (mysql_query(mysql, release_sql.c_str()) != 0) {
+        mysql_query(mysql, "ROLLBACK");
+        return;
+    }
+
+    if (mysql_query(mysql, "COMMIT") != 0) {
+        mysql_query(mysql, "ROLLBACK");
+    }
+}
+
 MysqlOrderRepository::MysqlOrderRepository(connection_pool* pool)
     : pool_(pool)
 {

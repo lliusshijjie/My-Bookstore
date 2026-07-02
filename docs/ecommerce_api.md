@@ -14,11 +14,14 @@ will not call gRPC directly.
 - Response body: JSON
 - Success shape: `{"code":0,"message":"ok","data":...}`
 - Error shape: `{"code":<number>,"message":"<reason>","data":null}`
-- Phase 2 default storage: in-process memory repositories with seeded data
-- Runtime storage: `WebServer::sql_pool()` switches the API gateway to MySQL
-  DAO repositories after the connection pool is initialized
+- Runtime storage: MySQL DAO repositories are the production data source.
+  Memory repositories are only test and local-development substitutes.
+- `WebServer::sql_pool()` switches the API gateway to MySQL DAO repositories
+  after the connection pool is initialized.
 - SQL boundary: `UserService`, `BookService`, `InventoryService`, and
   `OrderService` depend on repository interfaces and do not call the MySQL C API
+- Phase 3 contract boundary: backend-to-backend APIs are defined in `proto/`
+  using `bookstore.<domain>.v1` packages
 
 ## Phase 1 Implemented Endpoint
 
@@ -42,9 +45,9 @@ Response `200 OK`:
 
 Phase 2 runs as a modular monolith. `ApiGateway` owns `UserService`,
 `BookService`, `InventoryService`, and `OrderService` instances. Services use
-repository interfaces, so tests can keep memory repositories while the running
-server can use MySQL DAO repositories. Later gRPC services should keep these
-repository boundaries instead of moving SQL into service logic.
+repository interfaces, so tests can keep memory repositories while runtime
+services use MySQL DAO repositories. gRPC services keep these repository
+boundaries instead of moving SQL into service logic.
 
 ### POST /api/auth/register
 
@@ -167,10 +170,10 @@ Lists orders currently stored in the monolith order service.
 
 The repository layer has two implementations:
 
-- `src/app/repository/memory/`: default in-memory repositories used by tests and
-  standalone service construction.
-- `src/app/repository/mysql/`: MySQL DAO implementation used by `WebServer`
-  after `connection_pool` is initialized.
+- `src/app/repository/memory/`: in-memory repositories used by tests and
+  explicit local-development substitutes.
+- `src/app/repository/mysql/`: MySQL DAO implementation used by `WebServer` and
+  `inventory_grpc_server` after `connection_pool` is initialized.
 
 ## Planned APIs
 
@@ -182,5 +185,18 @@ The repository layer has two implementations:
 - `GET /api/orders/{order_id}`: fetch order details.
 - `POST /api/orders/{order_id}/cancel`: cancel an unpaid order and release stock.
 
-Inventory reservation will later move behind `inventory-service` and be called
-from the order flow through gRPC.
+Inventory now has the first gRPC service boundary. `inventory_grpc_server`
+exposes `GetInventory`, `ReserveInventory`, and `ReleaseInventory` from
+`proto/inventory/v1/inventory.proto`, backed by `MysqlInventoryRepository`.
+
+The gateway keeps a local inventory client by default. Set
+`INVENTORY_GRPC_TARGET=127.0.0.1:50051` when the gateway should call the remote
+inventory gRPC service for inventory queries and order reservations. Order
+creation now uses a single reservation id for the whole order and releases that
+reservation if order persistence fails.
+
+Run the Docker-based inventory gRPC closure test with:
+
+```bash
+scripts/verify_inventory_grpc_e2e.sh
+```

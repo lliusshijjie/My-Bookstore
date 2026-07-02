@@ -1,10 +1,5 @@
 version: "3.9"
 
-# ============================================================
-#  TinyWebServer + MySQL 本地开发/测试环境
-#  启动: docker compose -f deploy/docker/docker-compose.yml up --build
-# ============================================================
-
 services:
   mysql:
     image: mysql:8.0
@@ -21,13 +16,35 @@ services:
     ports:
       - "3306:3306"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root",
-             "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  inventory-service:
+    image: tinywebserver-app:latest
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    container_name: tinywebserver-inventory
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      INVENTORY_DB_HOST: mysql
+      INVENTORY_DB_PORT: 3306
+      INVENTORY_DB_USER: ${MYSQL_USER:-tinyuser}
+      INVENTORY_DB_PASSWORD: ${MYSQL_PASSWORD:-tinypass}
+      INVENTORY_DB_NAME: ${MYSQL_DATABASE:-qgydb}
+      INVENTORY_DB_POOL_SIZE: 8
+    entrypoint: ["/app/inventory_grpc_server"]
+    command: ["0.0.0.0:50051"]
+    ports:
+      - "${INVENTORY_GRPC_PORT:-50051}:50051"
+
   server:
+    image: tinywebserver-app:latest
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
@@ -36,10 +53,15 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      inventory-service:
+        condition: service_started
     environment:
-      # 这些环境变量目前通过命令行参数注入（见 CMD）
-      # 未来可改造 main.cpp 读取环境变量实现无感配置
       MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-tinyuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-tinypass}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-qgydb}
+      INVENTORY_GRPC_TARGET: inventory-service:50051
     ports:
       - "${SERVER_PORT:-9006}:9006"
     command:

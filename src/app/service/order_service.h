@@ -1,5 +1,7 @@
 #pragma once
 
+#include "src/app/client/inventory_client.h"
+#include "src/app/client/local_inventory_client.h"
 #include "src/app/model/order.h"
 #include "src/app/repository/book_repository.h"
 #include "src/app/repository/inventory_repository.h"
@@ -8,8 +10,10 @@
 #include "src/app/service/book_service.h"
 #include "src/app/service/inventory_service.h"
 
+#include <atomic>
 #include <memory>
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -17,7 +21,7 @@ class OrderService {
 public:
     OrderService(const BookService& book_service, InventoryService& inventory_service)
         : book_repository_(book_service.repository()),
-          inventory_repository_(inventory_service.repository()),
+          inventory_client_(std::make_shared<LocalInventoryClient>(inventory_service.repository())),
           order_repository_(std::make_shared<MemoryOrderRepository>())
     {
     }
@@ -26,7 +30,16 @@ public:
                  std::shared_ptr<InventoryRepository> inventory_repository,
                  std::shared_ptr<OrderRepository> order_repository)
         : book_repository_(std::move(book_repository)),
-          inventory_repository_(std::move(inventory_repository)),
+          inventory_client_(std::make_shared<LocalInventoryClient>(std::move(inventory_repository))),
+          order_repository_(std::move(order_repository))
+    {
+    }
+
+    OrderService(std::shared_ptr<BookRepository> book_repository,
+                 std::shared_ptr<InventoryClient> inventory_client,
+                 std::shared_ptr<OrderRepository> order_repository)
+        : book_repository_(std::move(book_repository)),
+          inventory_client_(std::move(inventory_client)),
           order_repository_(std::move(order_repository))
     {
     }
@@ -48,22 +61,20 @@ public:
             total += book->price_cents * request.quantity;
         }
 
-        std::vector<OrderItemRequest> reserved;
+        std::vector<InventoryMutation> reservation_items;
+        reservation_items.reserve(item_requests.size());
         for (const auto& request : item_requests) {
-            if (!inventory_repository_->reserve_stock(request.book_id, request.quantity)) {
-                for (const auto& item : reserved) {
-                    inventory_repository_->release_stock(item.book_id, item.quantity);
-                }
-                return std::nullopt;
-            }
-            reserved.push_back(request);
+            reservation_items.push_back(InventoryMutation{request.book_id, request.quantity});
+        }
+
+        const auto reservation_id = next_reservation_id(user_id);
+        if (!inventory_client_->reserve_stock(reservation_id, reservation_items)) {
+            return std::nullopt;
         }
 
         auto order = order_repository_->create_order(user_id, items, total);
         if (!order.has_value()) {
-            for (const auto& item : reserved) {
-                inventory_repository_->release_stock(item.book_id, item.quantity);
-            }
+            inventory_client_->release_stock(reservation_id, reservation_items);
         }
         return order;
     }
@@ -74,7 +85,14 @@ public:
     }
 
 private:
+    static std::string next_reservation_id(int user_id)
+    {
+        static std::atomic<unsigned long> next_id{1};
+        return "order-" + std::to_string(user_id) + "-" +
+            std::to_string(next_id.fetch_add(1));
+    }
+
     std::shared_ptr<BookRepository> book_repository_;
-    std::shared_ptr<InventoryRepository> inventory_repository_;
+    std::shared_ptr<InventoryClient> inventory_client_;
     std::shared_ptr<OrderRepository> order_repository_;
 };

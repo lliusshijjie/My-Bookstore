@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package bookstore.common.v1;
+
+option cc_enable_arenas = true;
+
+message PageRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message PageResponse {
+  string next_page_token = 1;
+  int32 total_size = 2;
+}
+
+message Empty {}

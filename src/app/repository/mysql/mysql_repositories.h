@@ -38,6 +38,10 @@ public:
     std::optional<int> available_stock(int book_id) const override;
     bool reserve_stock(int book_id, int quantity) override;
     void release_stock(int book_id, int quantity) override;
+    bool reserve_stock(const std::string& reservation_id,
+                       const std::vector<InventoryMutation>& items) override;
+    void release_stock(const std::string& reservation_id,
+                       const std::vector<InventoryMutation>& items) override;
 
 private:
     connection_pool* pool_{nullptr};

@@ -4,6 +4,8 @@
 #include "src/app/controller/book_controller.h"
 #include "src/app/controller/inventory_controller.h"
 #include "src/app/controller/order_controller.h"
+#include "src/app/client/inventory_client.h"
+#include "src/app/client/local_inventory_client.h"
 #include "src/app/repository/book_repository.h"
 #include "src/app/repository/inventory_repository.h"
 #include "src/app/repository/memory/memory_repositories.h"
@@ -34,6 +36,7 @@ public:
         std::shared_ptr<BookRepository> books;
         std::shared_ptr<InventoryRepository> inventory;
         std::shared_ptr<OrderRepository> orders;
+        std::shared_ptr<InventoryClient> inventory_client;
     };
 
     explicit ApiGateway(Dependencies dependencies)
@@ -41,18 +44,27 @@ public:
           user_service_(dependencies_.users),
           book_service_(dependencies_.books),
           inventory_service_(dependencies_.inventory),
-          order_service_(dependencies_.books, dependencies_.inventory, dependencies_.orders)
+          order_service_(dependencies_.books, dependencies_.inventory_client, dependencies_.orders)
     {
+        ensure_inventory_client();
+        order_service_ = OrderService(
+            dependencies_.books,
+            dependencies_.inventory_client,
+            dependencies_.orders);
         register_routes();
     }
 
     void use_dependencies(Dependencies dependencies)
     {
         dependencies_ = std::move(dependencies);
+        ensure_inventory_client();
         user_service_ = UserService(dependencies_.users);
         book_service_ = BookService(dependencies_.books);
         inventory_service_ = InventoryService(dependencies_.inventory);
-        order_service_ = OrderService(dependencies_.books, dependencies_.inventory, dependencies_.orders);
+        order_service_ = OrderService(
+            dependencies_.books,
+            dependencies_.inventory_client,
+            dependencies_.orders);
     }
 
     std::optional<HttpResponse> dispatch(const HttpRequest& request) const
@@ -73,6 +85,7 @@ public:
                 InventoryItem{2, 4},
             }),
             std::make_shared<MemoryOrderRepository>(),
+            nullptr,
         };
     }
 
@@ -83,10 +96,19 @@ public:
             std::make_shared<MysqlBookRepository>(pool),
             std::make_shared<MysqlInventoryRepository>(pool),
             std::make_shared<MysqlOrderRepository>(pool),
+            nullptr,
         };
     }
 
 private:
+    void ensure_inventory_client()
+    {
+        if (!dependencies_.inventory_client) {
+            dependencies_.inventory_client =
+                std::make_shared<LocalInventoryClient>(dependencies_.inventory);
+        }
+    }
+
     void register_routes()
     {
         router_.add_route(HttpMethod::Get, "/api/health",
@@ -109,7 +131,7 @@ private:
             });
         router_.add_route(HttpMethod::Get, "/api/inventory/books/{book_id}",
             [this](const HttpRequest& request) {
-                return handle_get_inventory(request, inventory_service_);
+                return handle_get_inventory(request, *dependencies_.inventory_client);
             });
         router_.add_route(HttpMethod::Post, "/api/orders",
             [this](const HttpRequest& request) {

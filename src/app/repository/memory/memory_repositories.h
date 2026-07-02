@@ -115,6 +115,35 @@ public:
         stock_[book_id] += quantity;
     }
 
+    bool reserve_stock(const std::string&,
+                       const std::vector<InventoryMutation>& items) override
+    {
+        if (items.empty()) return false;
+
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (const auto& item : items) {
+            auto it = stock_.find(item.book_id);
+            if (item.quantity <= 0 || it == stock_.end() || it->second < item.quantity) {
+                return false;
+            }
+        }
+        for (const auto& item : items) {
+            stock_[item.book_id] -= item.quantity;
+        }
+        return true;
+    }
+
+    void release_stock(const std::string&,
+                       const std::vector<InventoryMutation>& items) override
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (const auto& item : items) {
+            if (item.quantity > 0) {
+                stock_[item.book_id] += item.quantity;
+            }
+        }
+    }
+
 private:
     mutable std::mutex mutex_;
     std::unordered_map<int, int> stock_;

@@ -8,6 +8,7 @@
 - `server`：当前 C++ HTTP 服务端，负责静态资源、HTTP API、连接管理和请求分发。
 - `src/net/http/`：HTTP 解析、响应构造和路由基础设施。
 - `src/app/`：API 网关入口，包含 controller、service、repository 接口、内存仓储和 MySQL DAO。
+- `proto/`：后续 gRPC 服务拆分使用的 Protobuf 契约。
 - `scripts/init.sql`：本地 MySQL 初始化脚本，包含用户、图书、库存、订单和订单明细表。
 - `docs/ecommerce_api.md`：HTTP API 约定和接口规划。
 
@@ -149,6 +150,15 @@ cd build && ctest --output-on-failure
 ```bash
 make server
 ./server -p 9006
+```
+
+```bash
+make grpc-stubs
+cmake --build build --target inventory_grpc_server
+INVENTORY_DB_HOST=127.0.0.1 INVENTORY_DB_PORT=3306 INVENTORY_DB_USER=root INVENTORY_DB_PASSWORD=root INVENTORY_DB_NAME=qgydb \
+./build/inventory_grpc_server 0.0.0.0:50051
+INVENTORY_GRPC_TARGET=127.0.0.1:50051 ./server -p 9006
+scripts/verify_inventory_grpc_e2e.sh
 ```
 
 当前已实现的网关接口：

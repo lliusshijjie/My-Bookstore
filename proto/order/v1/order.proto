@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package bookstore.order.v1;
+
+import "proto/common/v1/common.proto";
+
+option cc_enable_arenas = true;
+
+service OrderService {
+  rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse);
+  rpc ListOrders(ListOrdersRequest) returns (ListOrdersResponse);
+  rpc GetOrder(GetOrderRequest) returns (GetOrderResponse);
+  rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse);
+}
+
+enum OrderStatus {
+  ORDER_STATUS_UNSPECIFIED = 0;
+  ORDER_STATUS_CREATED = 1;
+  ORDER_STATUS_CANCELLED = 2;
+}
+
+message OrderItemRequest {
+  int64 book_id = 1;
+  int32 quantity = 2;
+}
+
+message OrderItem {
+  int64 book_id = 1;
+  int32 quantity = 2;
+  int64 unit_price_cents = 3;
+}
+
+message Order {
+  int64 order_id = 1;
+  int64 user_id = 2;
+  repeated OrderItem items = 3;
+  int64 total_cents = 4;
+  OrderStatus status = 5;
+}
+
+message CreateOrderRequest {
+  int64 user_id = 1;
+  repeated OrderItemRequest items = 2;
+}
+
+message CreateOrderResponse {
+  Order order = 1;
+}
+
+message ListOrdersRequest {
+  int64 user_id = 1;
+  bookstore.common.v1.PageRequest page = 2;
+}
+
+message ListOrdersResponse {
+  repeated Order orders = 1;
+  bookstore.common.v1.PageResponse page = 2;
+}
+
+message GetOrderRequest {
+  int64 order_id = 1;
+}
+
+message GetOrderResponse {
+  Order order = 1;
+}
+
+message CancelOrderRequest {
+  int64 order_id = 1;
+  int64 user_id = 2;
+  string reason = 3;
+}
+
+message CancelOrderResponse {
+  Order order = 1;
+}

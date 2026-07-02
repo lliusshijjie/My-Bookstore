@@ -6,9 +6,9 @@
 #include <string>
 #include <vector>
 
-class InventoryRepository {
+class InventoryClient {
 public:
-    virtual ~InventoryRepository() = default;
+    virtual ~InventoryClient() = default;
 
     virtual std::optional<int> available_stock(int book_id) const = 0;
     virtual bool reserve_stock(int book_id, int quantity) = 0;
