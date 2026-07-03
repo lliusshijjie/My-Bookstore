@@ -1,6 +1,8 @@
 #pragma once
 
+#include "src/app/client/book_client.h"
 #include "src/app/client/inventory_client.h"
+#include "src/app/client/local_book_client.h"
 #include "src/app/client/local_inventory_client.h"
 #include "src/app/model/order.h"
 #include "src/app/repository/book_repository.h"
@@ -20,7 +22,7 @@
 class OrderService {
 public:
     OrderService(const BookService& book_service, InventoryService& inventory_service)
-        : book_repository_(book_service.repository()),
+        : book_client_(std::make_shared<LocalBookClient>(book_service)),
           inventory_client_(std::make_shared<LocalInventoryClient>(inventory_service.repository())),
           order_repository_(std::make_shared<MemoryOrderRepository>())
     {
@@ -30,6 +32,7 @@ public:
                  std::shared_ptr<InventoryRepository> inventory_repository,
                  std::shared_ptr<OrderRepository> order_repository)
         : book_repository_(std::move(book_repository)),
+          book_client_(std::make_shared<LocalBookClient>(book_repository_)),
           inventory_client_(std::make_shared<LocalInventoryClient>(std::move(inventory_repository))),
           order_repository_(std::move(order_repository))
     {
@@ -39,6 +42,16 @@ public:
                  std::shared_ptr<InventoryClient> inventory_client,
                  std::shared_ptr<OrderRepository> order_repository)
         : book_repository_(std::move(book_repository)),
+          book_client_(std::make_shared<LocalBookClient>(book_repository_)),
+          inventory_client_(std::move(inventory_client)),
+          order_repository_(std::move(order_repository))
+    {
+    }
+
+    OrderService(std::shared_ptr<BookClient> book_client,
+                 std::shared_ptr<InventoryClient> inventory_client,
+                 std::shared_ptr<OrderRepository> order_repository)
+        : book_client_(std::move(book_client)),
           inventory_client_(std::move(inventory_client)),
           order_repository_(std::move(order_repository))
     {
@@ -54,7 +67,7 @@ public:
 
         for (const auto& request : item_requests) {
             if (request.quantity <= 0) return std::nullopt;
-            auto book = book_repository_->find_book(request.book_id);
+            auto book = book_client_->find_book(request.book_id);
             if (!book.has_value()) return std::nullopt;
 
             items.push_back(OrderItem{request.book_id, request.quantity, book->price_cents});
@@ -93,6 +106,7 @@ private:
     }
 
     std::shared_ptr<BookRepository> book_repository_;
+    std::shared_ptr<BookClient> book_client_;
     std::shared_ptr<InventoryClient> inventory_client_;
     std::shared_ptr<OrderRepository> order_repository_;
 };

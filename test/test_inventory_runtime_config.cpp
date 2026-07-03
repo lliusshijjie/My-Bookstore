@@ -37,14 +37,19 @@ int main()
     const auto compose = read_file("deploy/docker/docker-compose.yml");
     assert(!compose.empty());
     assert_contains(compose, "inventory-service:");
+    assert_contains(compose, "order-service:");
     assert_contains(compose, "INVENTORY_GRPC_TARGET: inventory-service:50051");
+    assert_contains(compose, "ORDER_GRPC_TARGET: order-service:50052");
     assert_contains(compose, "INVENTORY_DB_HOST: mysql");
+    assert_contains(compose, "ORDER_DB_HOST: mysql");
     assert_contains(compose, "entrypoint: [\"/app/inventory_grpc_server\"]");
+    assert_contains(compose, "entrypoint: [\"/app/order_grpc_server\"]");
 
     const auto dockerfile = read_file("deploy/docker/Dockerfile");
     assert(!dockerfile.empty());
     assert_contains(dockerfile, "protobuf-compiler-grpc");
     assert_contains(dockerfile, "COPY --from=builder /build/build/inventory_grpc_server");
+    assert_contains(dockerfile, "COPY --from=builder /build/build/order_grpc_server");
 
     const auto e2e = read_file("scripts/verify_inventory_grpc_e2e.sh");
     assert(!e2e.empty());

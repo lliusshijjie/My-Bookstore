@@ -55,6 +55,9 @@ int main()
         std::make_shared<MemoryInventoryRepository>(),
         std::make_shared<MemoryOrderRepository>(),
         std::make_shared<FixedInventoryClient>(),
+        nullptr,
+        nullptr,
+        nullptr,
     };
     ApiGateway gateway(dependencies);
 

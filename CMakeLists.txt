@@ -102,10 +102,22 @@ if(PROTOC_EXECUTABLE AND GRPC_CPP_PLUGIN_EXECUTABLE AND Protobuf_FOUND AND GRPCP
     set(GENERATED_PROTO_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
     set(COMMON_PROTO_SRC ${GENERATED_PROTO_DIR}/proto/common/v1/common.pb.cc)
     set(COMMON_PROTO_HDR ${GENERATED_PROTO_DIR}/proto/common/v1/common.pb.h)
+    set(USER_PROTO_SRC ${GENERATED_PROTO_DIR}/proto/user/v1/user.pb.cc)
+    set(USER_PROTO_HDR ${GENERATED_PROTO_DIR}/proto/user/v1/user.pb.h)
+    set(USER_GRPC_SRC ${GENERATED_PROTO_DIR}/proto/user/v1/user.grpc.pb.cc)
+    set(USER_GRPC_HDR ${GENERATED_PROTO_DIR}/proto/user/v1/user.grpc.pb.h)
+    set(BOOK_PROTO_SRC ${GENERATED_PROTO_DIR}/proto/book/v1/book.pb.cc)
+    set(BOOK_PROTO_HDR ${GENERATED_PROTO_DIR}/proto/book/v1/book.pb.h)
+    set(BOOK_GRPC_SRC ${GENERATED_PROTO_DIR}/proto/book/v1/book.grpc.pb.cc)
+    set(BOOK_GRPC_HDR ${GENERATED_PROTO_DIR}/proto/book/v1/book.grpc.pb.h)
     set(INVENTORY_PROTO_SRC ${GENERATED_PROTO_DIR}/proto/inventory/v1/inventory.pb.cc)
     set(INVENTORY_PROTO_HDR ${GENERATED_PROTO_DIR}/proto/inventory/v1/inventory.pb.h)
     set(INVENTORY_GRPC_SRC ${GENERATED_PROTO_DIR}/proto/inventory/v1/inventory.grpc.pb.cc)
     set(INVENTORY_GRPC_HDR ${GENERATED_PROTO_DIR}/proto/inventory/v1/inventory.grpc.pb.h)
+    set(ORDER_PROTO_SRC ${GENERATED_PROTO_DIR}/proto/order/v1/order.pb.cc)
+    set(ORDER_PROTO_HDR ${GENERATED_PROTO_DIR}/proto/order/v1/order.pb.h)
+    set(ORDER_GRPC_SRC ${GENERATED_PROTO_DIR}/proto/order/v1/order.grpc.pb.cc)
+    set(ORDER_GRPC_HDR ${GENERATED_PROTO_DIR}/proto/order/v1/order.grpc.pb.h)
 
     add_custom_command(
         OUTPUT ${COMMON_PROTO_SRC} ${COMMON_PROTO_HDR}
@@ -132,8 +144,64 @@ if(PROTOC_EXECUTABLE AND GRPC_CPP_PLUGIN_EXECUTABLE AND Protobuf_FOUND AND GRPCP
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         COMMENT "Generating inventory gRPC stubs")
 
-    add_library(inventory_grpc_proto
+    add_custom_command(
+        OUTPUT ${USER_PROTO_SRC} ${USER_PROTO_HDR}
+               ${USER_GRPC_SRC} ${USER_GRPC_HDR}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${GENERATED_PROTO_DIR}
+        COMMAND ${PROTOC_EXECUTABLE}
+                --proto_path=${CMAKE_CURRENT_SOURCE_DIR}
+                --cpp_out=${GENERATED_PROTO_DIR}
+                --grpc_out=${GENERATED_PROTO_DIR}
+                --plugin=protoc-gen-grpc=${GRPC_CPP_PLUGIN_EXECUTABLE}
+                proto/user/v1/user.proto
+        DEPENDS proto/user/v1/user.proto
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Generating user gRPC stubs")
+
+    add_custom_command(
+        OUTPUT ${BOOK_PROTO_SRC} ${BOOK_PROTO_HDR}
+               ${BOOK_GRPC_SRC} ${BOOK_GRPC_HDR}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${GENERATED_PROTO_DIR}
+        COMMAND ${PROTOC_EXECUTABLE}
+                --proto_path=${CMAKE_CURRENT_SOURCE_DIR}
+                --cpp_out=${GENERATED_PROTO_DIR}
+                --grpc_out=${GENERATED_PROTO_DIR}
+                --plugin=protoc-gen-grpc=${GRPC_CPP_PLUGIN_EXECUTABLE}
+                proto/book/v1/book.proto
+        DEPENDS proto/book/v1/book.proto proto/common/v1/common.proto
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Generating book gRPC stubs")
+
+    add_custom_command(
+        OUTPUT ${ORDER_PROTO_SRC} ${ORDER_PROTO_HDR}
+               ${ORDER_GRPC_SRC} ${ORDER_GRPC_HDR}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${GENERATED_PROTO_DIR}
+        COMMAND ${PROTOC_EXECUTABLE}
+                --proto_path=${CMAKE_CURRENT_SOURCE_DIR}
+                --cpp_out=${GENERATED_PROTO_DIR}
+                --grpc_out=${GENERATED_PROTO_DIR}
+                --plugin=protoc-gen-grpc=${GRPC_CPP_PLUGIN_EXECUTABLE}
+                proto/order/v1/order.proto
+        DEPENDS proto/order/v1/order.proto proto/common/v1/common.proto
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Generating order gRPC stubs")
+
+    add_library(common_grpc_proto
         ${COMMON_PROTO_SRC}
+    )
+    target_include_directories(common_grpc_proto
+        PUBLIC
+            ${GENERATED_PROTO_DIR}
+            ${Protobuf_INCLUDE_DIRS}
+            ${GRPCPP_INCLUDE_DIRS}
+    )
+    target_link_libraries(common_grpc_proto
+        PUBLIC
+            ${Protobuf_LIBRARIES}
+            ${GRPCPP_LDFLAGS}
+    )
+
+    add_library(inventory_grpc_proto
         ${INVENTORY_PROTO_SRC}
         ${INVENTORY_GRPC_SRC}
     )
@@ -145,6 +213,57 @@ if(PROTOC_EXECUTABLE AND GRPC_CPP_PLUGIN_EXECUTABLE AND Protobuf_FOUND AND GRPCP
     )
     target_link_libraries(inventory_grpc_proto
         PUBLIC
+            common_grpc_proto
+            ${Protobuf_LIBRARIES}
+            ${GRPCPP_LDFLAGS}
+    )
+
+    add_library(user_grpc_proto
+        ${USER_PROTO_SRC}
+        ${USER_GRPC_SRC}
+    )
+    target_include_directories(user_grpc_proto
+        PUBLIC
+            ${GENERATED_PROTO_DIR}
+            ${Protobuf_INCLUDE_DIRS}
+            ${GRPCPP_INCLUDE_DIRS}
+    )
+    target_link_libraries(user_grpc_proto
+        PUBLIC
+            ${Protobuf_LIBRARIES}
+            ${GRPCPP_LDFLAGS}
+    )
+
+    add_library(book_grpc_proto
+        ${BOOK_PROTO_SRC}
+        ${BOOK_GRPC_SRC}
+    )
+    target_include_directories(book_grpc_proto
+        PUBLIC
+            ${GENERATED_PROTO_DIR}
+            ${Protobuf_INCLUDE_DIRS}
+            ${GRPCPP_INCLUDE_DIRS}
+    )
+    target_link_libraries(book_grpc_proto
+        PUBLIC
+            common_grpc_proto
+            ${Protobuf_LIBRARIES}
+            ${GRPCPP_LDFLAGS}
+    )
+
+    add_library(order_grpc_proto
+        ${ORDER_PROTO_SRC}
+        ${ORDER_GRPC_SRC}
+    )
+    target_include_directories(order_grpc_proto
+        PUBLIC
+            ${GENERATED_PROTO_DIR}
+            ${Protobuf_INCLUDE_DIRS}
+            ${GRPCPP_INCLUDE_DIRS}
+    )
+    target_link_libraries(order_grpc_proto
+        PUBLIC
+            common_grpc_proto
             ${Protobuf_LIBRARIES}
             ${GRPCPP_LDFLAGS}
     )
@@ -160,18 +279,66 @@ if(PROTOC_EXECUTABLE AND GRPC_CPP_PLUGIN_EXECUTABLE AND Protobuf_FOUND AND GRPCP
     target_include_directories(inventory_grpc_server PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(inventory_grpc_server PRIVATE inventory_grpc_service)
 
+    add_library(order_grpc_service
+        src/app/grpc/order_grpc_service.cpp
+        src/app/client/grpc_order_client.cpp
+    )
+    target_include_directories(order_grpc_service PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(order_grpc_service PUBLIC order_grpc_proto)
+
+    add_library(user_grpc_service
+        src/app/grpc/user_grpc_service.cpp
+        src/app/client/grpc_user_client.cpp
+    )
+    target_include_directories(user_grpc_service PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(user_grpc_service PUBLIC user_grpc_proto)
+
+    add_library(book_grpc_service
+        src/app/grpc/book_grpc_service.cpp
+        src/app/client/grpc_book_client.cpp
+    )
+    target_include_directories(book_grpc_service PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(book_grpc_service PUBLIC book_grpc_proto)
+
+    add_executable(order_grpc_server src/app/grpc/order_server_main.cpp)
+    target_include_directories(order_grpc_server PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(order_grpc_server PRIVATE order_grpc_service inventory_grpc_service book_grpc_service)
+
+    add_executable(user_grpc_server src/app/grpc/user_server_main.cpp)
+    target_include_directories(user_grpc_server PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(user_grpc_server PRIVATE user_grpc_service)
+
+    add_executable(book_grpc_server src/app/grpc/book_server_main.cpp)
+    target_include_directories(book_grpc_server PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(book_grpc_server PRIVATE book_grpc_service)
+
     if(BUILD_TESTS)
         add_executable(test_inventory_grpc_service test/test_inventory_grpc_service.cpp)
         target_include_directories(test_inventory_grpc_service PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
         target_compile_features(test_inventory_grpc_service PRIVATE cxx_std_17)
         target_link_libraries(test_inventory_grpc_service PRIVATE inventory_grpc_service)
         add_test(NAME inventory_grpc_service COMMAND test_inventory_grpc_service)
+
+        add_executable(test_order_grpc_service test/test_order_grpc_service.cpp)
+        target_include_directories(test_order_grpc_service PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+        target_compile_features(test_order_grpc_service PRIVATE cxx_std_17)
+        target_link_libraries(test_order_grpc_service PRIVATE order_grpc_service inventory_grpc_service)
+        add_test(NAME order_grpc_service COMMAND test_order_grpc_service)
+
+        add_executable(test_user_book_grpc_service test/test_user_book_grpc_service.cpp)
+        target_include_directories(test_user_book_grpc_service PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+        target_compile_features(test_user_book_grpc_service PRIVATE cxx_std_17)
+        target_link_libraries(test_user_book_grpc_service PRIVATE user_grpc_service book_grpc_service)
+        add_test(NAME user_book_grpc_service COMMAND test_user_book_grpc_service)
     endif()
 
     target_link_libraries(server PRIVATE inventory_grpc_service)
+    target_link_libraries(server PRIVATE order_grpc_service)
+    target_link_libraries(server PRIVATE user_grpc_service)
+    target_link_libraries(server PRIVATE book_grpc_service)
     target_compile_definitions(server PRIVATE TINYWEBSERVER_ENABLE_GRPC)
 else()
-    message(STATUS "Inventory gRPC targets disabled. Need protoc, grpc_cpp_plugin, Protobuf, and grpc++ pkg-config metadata.")
+    message(STATUS "gRPC targets disabled. Need protoc, grpc_cpp_plugin, Protobuf, and grpc++ pkg-config metadata.")
 endif()
 
 find_package(Threads REQUIRED)
@@ -210,6 +377,51 @@ if(TARGET inventory_grpc_server)
         target_include_directories(inventory_grpc_server PRIVATE ${MYSQL_INCLUDE_DIR})
     else()
         target_link_libraries(inventory_grpc_server PRIVATE mysqlclient)
+    endif()
+endif()
+
+if(TARGET order_grpc_server)
+    target_sources(order_grpc_server PRIVATE
+        src/app/repository/mysql/mysql_repositories.cpp
+        src/db/sql_connection_pool.cpp
+        src/log/log.cpp
+    )
+    target_link_libraries(order_grpc_server PRIVATE Threads::Threads)
+    if(MYSQL_LIBRARY AND MYSQL_INCLUDE_DIR)
+        target_link_libraries(order_grpc_server PRIVATE ${MYSQL_LIBRARY})
+        target_include_directories(order_grpc_server PRIVATE ${MYSQL_INCLUDE_DIR})
+    else()
+        target_link_libraries(order_grpc_server PRIVATE mysqlclient)
+    endif()
+endif()
+
+if(TARGET user_grpc_server)
+    target_sources(user_grpc_server PRIVATE
+        src/app/repository/mysql/mysql_repositories.cpp
+        src/db/sql_connection_pool.cpp
+        src/log/log.cpp
+    )
+    target_link_libraries(user_grpc_server PRIVATE Threads::Threads)
+    if(MYSQL_LIBRARY AND MYSQL_INCLUDE_DIR)
+        target_link_libraries(user_grpc_server PRIVATE ${MYSQL_LIBRARY})
+        target_include_directories(user_grpc_server PRIVATE ${MYSQL_INCLUDE_DIR})
+    else()
+        target_link_libraries(user_grpc_server PRIVATE mysqlclient)
+    endif()
+endif()
+
+if(TARGET book_grpc_server)
+    target_sources(book_grpc_server PRIVATE
+        src/app/repository/mysql/mysql_repositories.cpp
+        src/db/sql_connection_pool.cpp
+        src/log/log.cpp
+    )
+    target_link_libraries(book_grpc_server PRIVATE Threads::Threads)
+    if(MYSQL_LIBRARY AND MYSQL_INCLUDE_DIR)
+        target_link_libraries(book_grpc_server PRIVATE ${MYSQL_LIBRARY})
+        target_include_directories(book_grpc_server PRIVATE ${MYSQL_INCLUDE_DIR})
+    else()
+        target_link_libraries(book_grpc_server PRIVATE mysqlclient)
     endif()
 endif()
 

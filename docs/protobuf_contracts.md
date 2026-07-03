@@ -47,7 +47,7 @@ On Ubuntu 20.04:
 sudo apt install protobuf-compiler libprotobuf-dev libgrpc++-dev protobuf-compiler-grpc pkg-config
 ```
 
-Inventory service stubs can be generated with:
+Service stubs can be generated with:
 
 ```bash
 make grpc-stubs
@@ -56,7 +56,10 @@ make grpc-stubs
 When the full gRPC C++ toolchain is available, CMake also creates:
 
 ```bash
+cmake --build build --target user_grpc_server
+cmake --build build --target book_grpc_server
 cmake --build build --target inventory_grpc_server
+cmake --build build --target order_grpc_server
 ```
 
 The inventory gRPC server uses MySQL through `MysqlInventoryRepository`.
@@ -82,3 +85,45 @@ With `INVENTORY_GRPC_TARGET` set, both `GET /api/inventory/books/{book_id}` and
 `POST /api/orders` use the inventory gRPC service. `ReserveInventory` is
 idempotent for an existing `reserved` reservation id, and `ReleaseInventory` is
 idempotent for an existing `released` reservation id.
+
+The user and book gRPC servers use their MySQL repositories directly:
+
+```bash
+export USER_DB_HOST=127.0.0.1
+export USER_DB_PORT=3306
+export USER_DB_USER=root
+export USER_DB_PASSWORD=root
+export USER_DB_NAME=qgydb
+./build/user_grpc_server 0.0.0.0:50053
+
+export BOOK_DB_HOST=127.0.0.1
+export BOOK_DB_PORT=3306
+export BOOK_DB_USER=root
+export BOOK_DB_PASSWORD=root
+export BOOK_DB_NAME=qgydb
+./build/book_grpc_server 0.0.0.0:50054
+```
+
+The order gRPC server uses `MysqlOrderRepository`, `GrpcBookClient`, and
+`GrpcInventoryClient`. Configure it with:
+
+```bash
+export ORDER_DB_HOST=127.0.0.1
+export ORDER_DB_PORT=3306
+export ORDER_DB_USER=root
+export ORDER_DB_PASSWORD=root
+export ORDER_DB_NAME=qgydb
+export ORDER_DB_POOL_SIZE=8
+export BOOK_GRPC_TARGET=127.0.0.1:50054
+export INVENTORY_GRPC_TARGET=127.0.0.1:50051
+./build/order_grpc_server 0.0.0.0:50052
+```
+
+The web gateway can call remote services by setting:
+
+```bash
+export USER_GRPC_TARGET=127.0.0.1:50053
+export BOOK_GRPC_TARGET=127.0.0.1:50054
+export INVENTORY_GRPC_TARGET=127.0.0.1:50051
+export ORDER_GRPC_TARGET=127.0.0.1:50052
+```

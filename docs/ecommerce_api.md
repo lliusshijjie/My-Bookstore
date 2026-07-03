@@ -43,11 +43,11 @@ Response `200 OK`:
 
 ## Phase 2 Implemented Endpoints
 
-Phase 2 runs as a modular monolith. `ApiGateway` owns `UserService`,
-`BookService`, `InventoryService`, and `OrderService` instances. Services use
-repository interfaces, so tests can keep memory repositories while runtime
-services use MySQL DAO repositories. gRPC services keep these repository
-boundaries instead of moving SQL into service logic.
+The gateway calls `UserClient`, `BookClient`, `InventoryClient`, and
+`OrderClient` interfaces. Each client has a local implementation for tests and
+a gRPC implementation for split-service runtime. Services still use repository
+interfaces, so SQL stays inside DAO classes instead of controllers or RPC
+clients.
 
 ### POST /api/auth/register
 
@@ -94,7 +94,7 @@ Response `200 OK`:
 
 ### GET /api/books
 
-Lists active books from the current monolith book module.
+Lists active books from the current book module or remote book gRPC service.
 
 Response `200 OK` includes `id`, `title`, `author`, `price_cents`, `stock`, and
 `status` for each book.
@@ -118,7 +118,9 @@ Response `200 OK`:
 
 ### POST /api/orders
 
-Creates an order and reserves inventory in the in-process inventory service.
+Creates an order. In split-service mode the gateway calls `order-service`; the
+order service calls `book-service` for pricing and `inventory-service` for stock
+reservation.
 
 Request:
 
@@ -156,7 +158,7 @@ invalid.
 
 ### GET /api/orders
 
-Lists orders currently stored in the monolith order service.
+Lists orders from the local order module or remote order gRPC service.
 
 ## Database Schema
 
@@ -173,7 +175,7 @@ The repository layer has two implementations:
 - `src/app/repository/memory/`: in-memory repositories used by tests and
   explicit local-development substitutes.
 - `src/app/repository/mysql/`: MySQL DAO implementation used by `WebServer` and
-  `inventory_grpc_server` after `connection_pool` is initialized.
+  standalone gRPC service processes after `connection_pool` is initialized.
 
 ## Planned APIs
 
@@ -185,15 +187,17 @@ The repository layer has two implementations:
 - `GET /api/orders/{order_id}`: fetch order details.
 - `POST /api/orders/{order_id}/cancel`: cancel an unpaid order and release stock.
 
-Inventory now has the first gRPC service boundary. `inventory_grpc_server`
-exposes `GetInventory`, `ReserveInventory`, and `ReleaseInventory` from
-`proto/inventory/v1/inventory.proto`, backed by `MysqlInventoryRepository`.
+The current gRPC boundaries are:
 
-The gateway keeps a local inventory client by default. Set
-`INVENTORY_GRPC_TARGET=127.0.0.1:50051` when the gateway should call the remote
-inventory gRPC service for inventory queries and order reservations. Order
-creation now uses a single reservation id for the whole order and releases that
-reservation if order persistence fails.
+- `user_grpc_server`: `Register` and `Login`, backed by `MysqlUserRepository`.
+- `book_grpc_server`: `ListBooks` and `GetBook`, backed by `MysqlBookRepository`.
+- `inventory_grpc_server`: `GetInventory`, `ReserveInventory`, and
+  `ReleaseInventory`, backed by `MysqlInventoryRepository`.
+- `order_grpc_server`: `CreateOrder` and `ListOrders`, backed by
+  `MysqlOrderRepository`; it calls book and inventory through gRPC.
+
+Set `USER_GRPC_TARGET`, `BOOK_GRPC_TARGET`, `INVENTORY_GRPC_TARGET`, and
+`ORDER_GRPC_TARGET` to route gateway calls to remote services.
 
 Run the Docker-based inventory gRPC closure test with:
 

@@ -12,7 +12,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker compose -f "${COMPOSE_FILE}" up -d --build mysql inventory-service server
+docker compose -f "${COMPOSE_FILE}" up -d --build mysql inventory-service user-service book-service order-service server
 
 for _ in $(seq 1 40); do
     if curl -fsS "http://127.0.0.1:${SERVER_PORT}/api/health" >/dev/null; then

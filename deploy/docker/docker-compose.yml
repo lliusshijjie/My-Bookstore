@@ -55,6 +55,12 @@ services:
         condition: service_healthy
       inventory-service:
         condition: service_started
+      user-service:
+        condition: service_started
+      book-service:
+        condition: service_started
+      order-service:
+        condition: service_started
     environment:
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
@@ -62,6 +68,9 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-tinypass}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-qgydb}
       INVENTORY_GRPC_TARGET: inventory-service:50051
+      ORDER_GRPC_TARGET: order-service:50052
+      USER_GRPC_TARGET: user-service:50053
+      BOOK_GRPC_TARGET: book-service:50054
     ports:
       - "${SERVER_PORT:-9006}:9006"
     command:
@@ -75,6 +84,78 @@ services:
       - "8"
       - "-s"
       - "8"
+
+  order-service:
+    image: tinywebserver-app:latest
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    container_name: tinywebserver-order
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      inventory-service:
+        condition: service_started
+      book-service:
+        condition: service_started
+    environment:
+      ORDER_DB_HOST: mysql
+      ORDER_DB_PORT: 3306
+      ORDER_DB_USER: ${MYSQL_USER:-tinyuser}
+      ORDER_DB_PASSWORD: ${MYSQL_PASSWORD:-tinypass}
+      ORDER_DB_NAME: ${MYSQL_DATABASE:-qgydb}
+      ORDER_DB_POOL_SIZE: 8
+      INVENTORY_GRPC_TARGET: inventory-service:50051
+      BOOK_GRPC_TARGET: book-service:50054
+    entrypoint: ["/app/order_grpc_server"]
+    command: ["0.0.0.0:50052"]
+    ports:
+      - "${ORDER_GRPC_PORT:-50052}:50052"
+
+  user-service:
+    image: tinywebserver-app:latest
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    container_name: tinywebserver-user
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      USER_DB_HOST: mysql
+      USER_DB_PORT: 3306
+      USER_DB_USER: ${MYSQL_USER:-tinyuser}
+      USER_DB_PASSWORD: ${MYSQL_PASSWORD:-tinypass}
+      USER_DB_NAME: ${MYSQL_DATABASE:-qgydb}
+      USER_DB_POOL_SIZE: 8
+    entrypoint: ["/app/user_grpc_server"]
+    command: ["0.0.0.0:50053"]
+    ports:
+      - "${USER_GRPC_PORT:-50053}:50053"
+
+  book-service:
+    image: tinywebserver-app:latest
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    container_name: tinywebserver-book
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      BOOK_DB_HOST: mysql
+      BOOK_DB_PORT: 3306
+      BOOK_DB_USER: ${MYSQL_USER:-tinyuser}
+      BOOK_DB_PASSWORD: ${MYSQL_PASSWORD:-tinypass}
+      BOOK_DB_NAME: ${MYSQL_DATABASE:-qgydb}
+      BOOK_DB_POOL_SIZE: 8
+    entrypoint: ["/app/book_grpc_server"]
+    command: ["0.0.0.0:50054"]
+    ports:
+      - "${BOOK_GRPC_PORT:-50054}:50054"
 
 volumes:
   mysql_data:

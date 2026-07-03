@@ -21,6 +21,7 @@ jobs:
             g++ \
             libmysqlclient-dev \
             libgrpc++-dev \
+            libprotobuf-dev \
             pkg-config \
             protobuf-compiler \
             protobuf-compiler-grpc
@@ -31,8 +32,22 @@ jobs:
       - name: Build
         run: cmake --build ci-build --parallel
 
+      - name: Validate Protobuf contracts
+        run: cmake --build ci-build --target check_proto_contracts
+
       - name: Run tests
         env:
           CTEST_OUTPUT_ON_FAILURE: "1"
         working-directory: ci-build
         run: ctest --output-on-failure
+
+      - name: Validate Makefile gRPC stub generation
+        run: |
+          make GRPC_OUT_DIR=/tmp/tinyweb-grpc-generated grpc-stubs
+          test -f /tmp/tinyweb-grpc-generated/proto/user/v1/user.grpc.pb.cc
+          test -f /tmp/tinyweb-grpc-generated/proto/book/v1/book.grpc.pb.cc
+          test -f /tmp/tinyweb-grpc-generated/proto/inventory/v1/inventory.grpc.pb.cc
+          test -f /tmp/tinyweb-grpc-generated/proto/order/v1/order.grpc.pb.cc
+
+      - name: Validate Makefile server build
+        run: make server

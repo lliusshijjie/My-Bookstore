@@ -4,8 +4,14 @@
 #include "src/app/controller/book_controller.h"
 #include "src/app/controller/inventory_controller.h"
 #include "src/app/controller/order_controller.h"
+#include "src/app/client/book_client.h"
 #include "src/app/client/inventory_client.h"
+#include "src/app/client/local_book_client.h"
 #include "src/app/client/local_inventory_client.h"
+#include "src/app/client/local_order_client.h"
+#include "src/app/client/local_user_client.h"
+#include "src/app/client/order_client.h"
+#include "src/app/client/user_client.h"
 #include "src/app/repository/book_repository.h"
 #include "src/app/repository/inventory_repository.h"
 #include "src/app/repository/memory/memory_repositories.h"
@@ -37,6 +43,9 @@ public:
         std::shared_ptr<InventoryRepository> inventory;
         std::shared_ptr<OrderRepository> orders;
         std::shared_ptr<InventoryClient> inventory_client;
+        std::shared_ptr<OrderClient> order_client;
+        std::shared_ptr<UserClient> user_client;
+        std::shared_ptr<BookClient> book_client;
     };
 
     explicit ApiGateway(Dependencies dependencies)
@@ -46,9 +55,12 @@ public:
           inventory_service_(dependencies_.inventory),
           order_service_(dependencies_.books, dependencies_.inventory_client, dependencies_.orders)
     {
+        ensure_user_client();
+        ensure_book_client();
         ensure_inventory_client();
+        ensure_order_client();
         order_service_ = OrderService(
-            dependencies_.books,
+            dependencies_.book_client,
             dependencies_.inventory_client,
             dependencies_.orders);
         register_routes();
@@ -57,12 +69,15 @@ public:
     void use_dependencies(Dependencies dependencies)
     {
         dependencies_ = std::move(dependencies);
+        ensure_user_client();
+        ensure_book_client();
         ensure_inventory_client();
+        ensure_order_client();
         user_service_ = UserService(dependencies_.users);
         book_service_ = BookService(dependencies_.books);
         inventory_service_ = InventoryService(dependencies_.inventory);
         order_service_ = OrderService(
-            dependencies_.books,
+            dependencies_.book_client,
             dependencies_.inventory_client,
             dependencies_.orders);
     }
@@ -86,6 +101,9 @@ public:
             }),
             std::make_shared<MemoryOrderRepository>(),
             nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
         };
     }
 
@@ -96,6 +114,9 @@ public:
             std::make_shared<MysqlBookRepository>(pool),
             std::make_shared<MysqlInventoryRepository>(pool),
             std::make_shared<MysqlOrderRepository>(pool),
+            nullptr,
+            nullptr,
+            nullptr,
             nullptr,
         };
     }
@@ -109,6 +130,33 @@ private:
         }
     }
 
+    void ensure_user_client()
+    {
+        if (!dependencies_.user_client) {
+            dependencies_.user_client =
+                std::make_shared<LocalUserClient>(dependencies_.users);
+        }
+    }
+
+    void ensure_book_client()
+    {
+        if (!dependencies_.book_client) {
+            dependencies_.book_client =
+                std::make_shared<LocalBookClient>(dependencies_.books);
+        }
+    }
+
+    void ensure_order_client()
+    {
+        if (!dependencies_.order_client) {
+            dependencies_.order_client = std::make_shared<LocalOrderClient>(
+                OrderService(
+                    dependencies_.books,
+                    dependencies_.inventory_client,
+                    dependencies_.orders));
+        }
+    }
+
     void register_routes()
     {
         router_.add_route(HttpMethod::Get, "/api/health",
@@ -119,15 +167,15 @@ private:
             });
         router_.add_route(HttpMethod::Get, "/api/books",
             [this](const HttpRequest& request) {
-                return handle_list_books(request, book_service_);
+                return handle_list_books(request, *dependencies_.book_client);
             });
         router_.add_route(HttpMethod::Post, "/api/auth/register",
             [this](const HttpRequest& request) {
-                return handle_register_user(request, user_service_);
+                return handle_register_user(request, *dependencies_.user_client);
             });
         router_.add_route(HttpMethod::Post, "/api/auth/login",
             [this](const HttpRequest& request) {
-                return handle_login_user(request, user_service_);
+                return handle_login_user(request, *dependencies_.user_client);
             });
         router_.add_route(HttpMethod::Get, "/api/inventory/books/{book_id}",
             [this](const HttpRequest& request) {
@@ -135,11 +183,11 @@ private:
             });
         router_.add_route(HttpMethod::Post, "/api/orders",
             [this](const HttpRequest& request) {
-                return handle_create_order(request, order_service_);
+                return handle_create_order(request, *dependencies_.order_client);
             });
         router_.add_route(HttpMethod::Get, "/api/orders",
             [this](const HttpRequest& request) {
-                return handle_list_orders(request, order_service_);
+                return handle_list_orders(request, *dependencies_.order_client);
             });
     }
 

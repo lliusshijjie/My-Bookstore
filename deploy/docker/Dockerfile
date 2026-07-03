@@ -39,13 +39,16 @@ WORKDIR /app
 # 拷贝编译产物和静态资源
 COPY --from=builder /build/build/server /app/server
 COPY --from=builder /build/build/inventory_grpc_server /app/inventory_grpc_server
+COPY --from=builder /build/build/order_grpc_server /app/order_grpc_server
+COPY --from=builder /build/build/user_grpc_server /app/user_grpc_server
+COPY --from=builder /build/build/book_grpc_server /app/book_grpc_server
 COPY --from=builder /build/client /app/client
 
 # 服务器运行时通过 getcwd()+"/client" 确定文档根目录，
 # 因此必须从 /app 目录启动二进制
 WORKDIR /app
 
-EXPOSE 9006 50051
+EXPOSE 9006 50051 50052 50053 50054
 
 # 默认启动参数（可被 docker run / k8s args 覆盖）
 # -p 端口  -l 日志模式(0同步/1异步)  -m 触发模式  -t 线程数  -s 连接池大小

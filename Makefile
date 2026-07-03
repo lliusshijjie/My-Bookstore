@@ -48,7 +48,16 @@ grpc-stubs:
 	$(PROTOC) --proto_path=. --cpp_out=$(GRPC_OUT_DIR) proto/common/v1/common.proto
 	$(PROTOC) --proto_path=. --cpp_out=$(GRPC_OUT_DIR) --grpc_out=$(GRPC_OUT_DIR) \
 		--plugin=protoc-gen-grpc=$$(command -v $(GRPC_CPP_PLUGIN)) \
+		proto/user/v1/user.proto
+	$(PROTOC) --proto_path=. --cpp_out=$(GRPC_OUT_DIR) --grpc_out=$(GRPC_OUT_DIR) \
+		--plugin=protoc-gen-grpc=$$(command -v $(GRPC_CPP_PLUGIN)) \
+		proto/book/v1/book.proto
+	$(PROTOC) --proto_path=. --cpp_out=$(GRPC_OUT_DIR) --grpc_out=$(GRPC_OUT_DIR) \
+		--plugin=protoc-gen-grpc=$$(command -v $(GRPC_CPP_PLUGIN)) \
 		proto/inventory/v1/inventory.proto
+	$(PROTOC) --proto_path=. --cpp_out=$(GRPC_OUT_DIR) --grpc_out=$(GRPC_OUT_DIR) \
+		--plugin=protoc-gen-grpc=$$(command -v $(GRPC_CPP_PLUGIN)) \
+		proto/order/v1/order.proto
 
 clean:
 	rm -f server

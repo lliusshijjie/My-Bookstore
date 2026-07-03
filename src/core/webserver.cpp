@@ -6,7 +6,10 @@
 #include "src/core/static_root.h"
 
 #ifdef TINYWEBSERVER_ENABLE_GRPC
+#include "src/app/client/grpc_book_client.h"
 #include "src/app/client/grpc_inventory_client.h"
+#include "src/app/client/grpc_order_client.h"
+#include "src/app/client/grpc_user_client.h"
 #endif
 
 namespace {
@@ -144,6 +147,18 @@ void WebServer::sql_pool()
     const char* inventory_grpc_target = std::getenv("INVENTORY_GRPC_TARGET");
     if (inventory_grpc_target != nullptr && inventory_grpc_target[0] != '\0') {
         dependencies.inventory_client = GrpcInventoryClient::connect(inventory_grpc_target);
+    }
+    const char* user_grpc_target = std::getenv("USER_GRPC_TARGET");
+    if (user_grpc_target != nullptr && user_grpc_target[0] != '\0') {
+        dependencies.user_client = GrpcUserClient::connect(user_grpc_target);
+    }
+    const char* book_grpc_target = std::getenv("BOOK_GRPC_TARGET");
+    if (book_grpc_target != nullptr && book_grpc_target[0] != '\0') {
+        dependencies.book_client = GrpcBookClient::connect(book_grpc_target);
+    }
+    const char* order_grpc_target = std::getenv("ORDER_GRPC_TARGET");
+    if (order_grpc_target != nullptr && order_grpc_target[0] != '\0') {
+        dependencies.order_client = GrpcOrderClient::connect(order_grpc_target);
     }
 #endif
     api_gateway.use_dependencies(std::move(dependencies));

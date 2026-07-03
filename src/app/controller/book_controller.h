@@ -1,5 +1,7 @@
 #pragma once
 
+#include "src/app/client/book_client.h"
+#include "src/app/client/local_book_client.h"
 #include "src/app/model/book.h"
 #include "src/app/service/book_service.h"
 #include "src/app/util/json.h"
@@ -35,14 +37,15 @@ inline std::string books_to_json_array(const std::vector<Book>& books)
     return out.str();
 }
 
-inline HttpResponse handle_list_books(const HttpRequest&, const BookService& service)
+inline HttpResponse handle_list_books(const HttpRequest&, const BookClient& client)
 {
     std::string body = "{\"code\":0,\"message\":\"ok\",\"data\":{\"books\":"
-        + books_to_json_array(service.list_books()) + "}}";
+        + books_to_json_array(client.list_books()) + "}}";
     return HttpResponse::json(200, std::move(body));
 }
 
 inline HttpResponse handle_list_books(const HttpRequest& request)
 {
-    return handle_list_books(request, default_book_service());
+    LocalBookClient client(default_book_service());
+    return handle_list_books(request, client);
 }

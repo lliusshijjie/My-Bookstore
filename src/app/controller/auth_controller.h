@@ -1,13 +1,13 @@
 #pragma once
 
-#include "src/app/service/user_service.h"
+#include "src/app/client/user_client.h"
 #include "src/app/util/json.h"
 #include "src/net/http/http_request.h"
 #include "src/net/http/http_response.h"
 
 #include <string>
 
-inline HttpResponse handle_register_user(const HttpRequest& request, UserService& service)
+inline HttpResponse handle_register_user(const HttpRequest& request, UserClient& client)
 {
     auto username = json_string_value(request.body, "username");
     auto password = json_string_value(request.body, "password");
@@ -15,7 +15,7 @@ inline HttpResponse handle_register_user(const HttpRequest& request, UserService
         return HttpResponse::json(400, "{\"code\":400,\"message\":\"invalid register request\",\"data\":null}");
     }
 
-    auto user = service.register_user(*username, *password);
+    auto user = client.register_user(*username, *password);
     if (!user.has_value()) {
         return HttpResponse::json(409, "{\"code\":409,\"message\":\"user already exists or invalid\",\"data\":null}");
     }
@@ -25,7 +25,7 @@ inline HttpResponse handle_register_user(const HttpRequest& request, UserService
     return HttpResponse::json(201, std::move(body));
 }
 
-inline HttpResponse handle_login_user(const HttpRequest& request, const UserService& service)
+inline HttpResponse handle_login_user(const HttpRequest& request, const UserClient& client)
 {
     auto username = json_string_value(request.body, "username");
     auto password = json_string_value(request.body, "password");
@@ -33,7 +33,7 @@ inline HttpResponse handle_login_user(const HttpRequest& request, const UserServ
         return HttpResponse::json(400, "{\"code\":400,\"message\":\"invalid login request\",\"data\":null}");
     }
 
-    auto user = service.authenticate(*username, *password);
+    auto user = client.authenticate(*username, *password);
     if (!user.has_value()) {
         return HttpResponse::json(401, "{\"code\":401,\"message\":\"invalid credentials\",\"data\":null}");
     }
