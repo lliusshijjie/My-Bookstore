@@ -33,6 +33,30 @@ public:
         order.items = {OrderItem{1, 1, 9800}};
         return {order};
     }
+
+    std::optional<Order> find_order(int order_id) const override
+    {
+        if (order_id != 91) return std::nullopt;
+        Order order;
+        order.id = 91;
+        order.user_id = 7;
+        order.status = "created";
+        order.total_cents = 9800;
+        order.items = {OrderItem{1, 1, 9800}};
+        return order;
+    }
+
+    std::optional<Order> cancel_order(int order_id) override
+    {
+        if (order_id != 91) return std::nullopt;
+        Order order;
+        order.id = 91;
+        order.user_id = 7;
+        order.status = "cancelled";
+        order.total_cents = 9800;
+        order.items = {OrderItem{1, 1, 9800}};
+        return order;
+    }
 };
 
 static HttpRequest request(HttpMethod method, const std::string& path, const std::string& body = "")

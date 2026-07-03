@@ -13,4 +13,6 @@ public:
         int user_id,
         const std::vector<OrderItemRequest>& items) = 0;
     virtual std::vector<Order> list_orders() const = 0;
+    virtual std::optional<Order> find_order(int order_id) const = 0;
+    virtual std::optional<Order> cancel_order(int order_id) = 0;
 };

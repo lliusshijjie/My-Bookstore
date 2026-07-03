@@ -28,6 +28,16 @@ public:
         return service_.find_book(book_id);
     }
 
+    std::optional<Book> create_book(const Book& book) override
+    {
+        return service_.create_book(book);
+    }
+
+    std::optional<Book> update_book(int book_id, const BookUpdate& update) override
+    {
+        return service_.update_book(book_id, update);
+    }
+
 private:
     BookService service_;
 };

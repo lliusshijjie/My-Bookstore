@@ -355,7 +355,7 @@ HttpConn::HttpCode HttpConn::do_request() {
 
         HttpRequest request;
         request.method = to_api_method(method_);
-        request.path = url_;
+        split_path_and_query(url_, request.path, request.query_params);
         request.body = request_body_;
         if (!host_.empty()) request.headers["Host"] = host_;
 

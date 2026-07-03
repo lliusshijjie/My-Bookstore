@@ -24,6 +24,29 @@ grpc::Status InventoryGrpcServiceImpl::GetInventory(
         response->mutable_item());
 }
 
+grpc::Status InventoryGrpcServiceImpl::InboundInventory(
+    grpc::ServerContext*,
+    const inventory_proto::InboundInventoryRequest* request,
+    inventory_proto::InboundInventoryResponse* response)
+{
+    if (request->book_id() <= 0 || request->quantity() <= 0) {
+        return grpc::Status(
+            grpc::StatusCode::INVALID_ARGUMENT,
+            "book_id and quantity must be positive");
+    }
+
+    auto stock = service_.add_stock(
+        static_cast<int>(request->book_id()),
+        request->quantity());
+    if (!stock.has_value()) {
+        return grpc::Status(grpc::StatusCode::NOT_FOUND, "inventory not found");
+    }
+
+    response->mutable_item()->set_book_id(request->book_id());
+    response->mutable_item()->set_available(*stock);
+    return grpc::Status::OK;
+}
+
 grpc::Status InventoryGrpcServiceImpl::ReserveInventory(
     grpc::ServerContext*,
     const inventory_proto::ReserveInventoryRequest* request,

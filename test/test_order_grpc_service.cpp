@@ -18,6 +18,11 @@ public:
         return 20;
     }
 
+    std::optional<int> add_stock(int, int) override
+    {
+        return 20;
+    }
+
     bool reserve_stock(int, int) override
     {
         return true;
@@ -77,14 +82,18 @@ int main()
     assert(list_response.orders(0).order_id() == 1);
 
     order_proto::GetOrderRequest get_request;
+    get_request.set_order_id(1);
     order_proto::GetOrderResponse get_response;
     auto get_status = service.GetOrder(nullptr, &get_request, &get_response);
-    assert(get_status.error_code() == grpc::StatusCode::UNIMPLEMENTED);
+    assert(get_status.ok());
+    assert(get_response.order().order_id() == 1);
 
     order_proto::CancelOrderRequest cancel_request;
+    cancel_request.set_order_id(1);
     order_proto::CancelOrderResponse cancel_response;
     auto cancel_status = service.CancelOrder(nullptr, &cancel_request, &cancel_response);
-    assert(cancel_status.error_code() == grpc::StatusCode::UNIMPLEMENTED);
+    assert(cancel_status.ok());
+    assert(cancel_response.order().status() == order_proto::ORDER_STATUS_CANCELLED);
 
     std::cout << "test_order_grpc_service: all passed\n";
     return 0;

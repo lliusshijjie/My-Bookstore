@@ -7,7 +7,9 @@
     user: null,
     books: [],
     cart: {},
-    authMode: 'login'
+    authMode: 'login',
+    searchQuery: '',
+    searchTimer: null
   };
 
   var els = {};
@@ -221,12 +223,13 @@
     showToast('已加入购物袋');
   }
 
-  function renderBooks() {
+  function renderBooks(books) {
+    var list = books || state.books;
     els.bookGrid.innerHTML = '';
-    setHidden(els.catalogEmpty, state.books.length > 0);
+    setHidden(els.catalogEmpty, list.length > 0);
     setHidden(els.catalogError, true);
 
-    state.books.forEach(function (book, index) {
+    list.forEach(function (book, index) {
       var card = document.createElement('article');
       card.className = 'book-card';
       card.setAttribute('role', 'listitem');
@@ -385,11 +388,32 @@
     });
   }
 
+  function setSearchStatus(text, status) {
+    if (!text) {
+      setHidden(els.searchStatus, true);
+      els.searchStatus.textContent = '';
+      els.searchStatus.removeAttribute('data-state');
+      return;
+    }
+    els.searchStatus.textContent = text;
+    els.searchStatus.setAttribute('data-state', status || '');
+    setHidden(els.searchStatus, false);
+  }
+
+  function updateSearchUI() {
+    var hasQuery = state.searchQuery.length > 0;
+    setHidden(els.searchClear, !hasQuery);
+    els.catalogHeading.textContent = hasQuery ? '搜索结果' : '书目';
+  }
+
   function fetchBooks() {
     Api.books().then(function (res) {
       if (res.ok && res.data && res.data.books) {
         state.books = res.data.books;
-        renderBooks();
+        if (!state.searchQuery) {
+          renderBooks(state.books);
+          setSearchStatus('', '');
+        }
       } else {
         els.catalogError.textContent = res.message || '加载书目失败';
         setHidden(els.catalogError, false);
@@ -398,6 +422,44 @@
       els.catalogError.textContent = '无法加载书目，请确认服务已启动';
       setHidden(els.catalogError, false);
     });
+  }
+
+  function runSearch(query) {
+    state.searchQuery = query.trim();
+    updateSearchUI();
+
+    if (!state.searchQuery) {
+      setSearchStatus('', '');
+      renderBooks(state.books);
+      return;
+    }
+
+    setSearchStatus('搜索中…', 'loading');
+    Api.searchBooks(state.searchQuery).then(function (res) {
+      if (res.ok && res.data && res.data.books) {
+        var engine = res.data.engine || 'memory';
+        var count = res.data.books.length;
+        setSearchStatus(
+          '找到 ' + count + ' 本 · 引擎 ' + engine,
+          ''
+        );
+        renderBooks(res.data.books);
+      } else {
+        setSearchStatus(res.message || '搜索失败', 'error');
+        renderBooks([]);
+      }
+    }).catch(function () {
+      setSearchStatus('搜索请求失败', 'error');
+      renderBooks([]);
+    });
+  }
+
+  function handleSearchInput() {
+    var query = els.searchInput.value;
+    clearTimeout(state.searchTimer);
+    state.searchTimer = setTimeout(function () {
+      runSearch(query);
+    }, 300);
   }
 
   function fetchOrders() {
@@ -513,12 +575,29 @@
     });
     els.checkoutBtn.addEventListener('click', handleCheckout);
     els.refreshOrders.addEventListener('click', fetchOrders);
+    els.searchForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      clearTimeout(state.searchTimer);
+      runSearch(els.searchInput.value);
+    });
+    els.searchInput.addEventListener('input', handleSearchInput);
+    els.searchClear.addEventListener('click', function () {
+      els.searchInput.value = '';
+      clearTimeout(state.searchTimer);
+      runSearch('');
+      els.searchInput.focus();
+    });
   }
 
   function init() {
     els = {
       gatewayStatus: $('gateway-status'),
       userBadge: $('user-badge'),
+      catalogHeading: $('catalog-heading'),
+      searchForm: $('search-form'),
+      searchInput: $('search-input'),
+      searchClear: $('search-clear'),
+      searchStatus: $('search-status'),
       bookGrid: $('book-grid'),
       catalogEmpty: $('catalog-empty'),
       catalogError: $('catalog-error'),

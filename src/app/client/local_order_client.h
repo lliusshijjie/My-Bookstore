@@ -24,6 +24,16 @@ public:
         return service_.list_orders();
     }
 
+    std::optional<Order> find_order(int order_id) const override
+    {
+        return service_.find_order(order_id);
+    }
+
+    std::optional<Order> cancel_order(int order_id) override
+    {
+        return service_.cancel_order(order_id);
+    }
+
 private:
     OrderService service_;
 };

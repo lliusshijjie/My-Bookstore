@@ -16,6 +16,7 @@ public:
     static std::shared_ptr<GrpcInventoryClient> connect(const std::string& target);
 
     std::optional<int> available_stock(int book_id) const override;
+    std::optional<int> add_stock(int book_id, int quantity) override;
     bool reserve_stock(int book_id, int quantity) override;
     void release_stock(int book_id, int quantity) override;
     bool reserve_stock(const std::string& reservation_id,

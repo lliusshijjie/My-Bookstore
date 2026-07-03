@@ -73,3 +73,27 @@ std::vector<Order> GrpcOrderClient::list_orders() const
     }
     return orders;
 }
+
+std::optional<Order> GrpcOrderClient::find_order(int order_id) const
+{
+    order_proto::GetOrderRequest request;
+    request.set_order_id(order_id);
+
+    order_proto::GetOrderResponse response;
+    grpc::ClientContext context;
+    auto status = stub_->GetOrder(&context, request, &response);
+    if (!status.ok()) return std::nullopt;
+    return order_from_proto(response.order());
+}
+
+std::optional<Order> GrpcOrderClient::cancel_order(int order_id)
+{
+    order_proto::CancelOrderRequest request;
+    request.set_order_id(order_id);
+
+    order_proto::CancelOrderResponse response;
+    grpc::ClientContext context;
+    auto status = stub_->CancelOrder(&context, request, &response);
+    if (!status.ok()) return std::nullopt;
+    return order_from_proto(response.order());
+}

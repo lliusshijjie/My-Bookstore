@@ -15,6 +15,8 @@ public:
 
     std::vector<Book> list_books() const override;
     std::optional<Book> find_book(int book_id) const override;
+    std::optional<Book> create_book(const Book& book) override;
+    std::optional<Book> update_book(int book_id, const BookUpdate& update) override;
 
 private:
     std::shared_ptr<bookstore::book::v1::BookService::Stub> stub_;

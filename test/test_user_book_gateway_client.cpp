@@ -40,6 +40,25 @@ public:
         }
         return std::nullopt;
     }
+
+    std::optional<Book> create_book(const Book& book) override
+    {
+        Book created = book;
+        created.id = 88;
+        return created;
+    }
+
+    std::optional<Book> update_book(int book_id, const BookUpdate& update) override
+    {
+        if (book_id != 77) return std::nullopt;
+        Book book{77, "RPC Systems", "Backend Team", 6600, 5, "active"};
+        if (update.title.has_value()) book.title = *update.title;
+        if (update.author.has_value()) book.author = *update.author;
+        if (update.price_cents.has_value()) book.price_cents = *update.price_cents;
+        if (update.stock.has_value()) book.stock = *update.stock;
+        if (update.status.has_value()) book.status = *update.status;
+        return book;
+    }
 };
 
 static HttpRequest request(HttpMethod method, const std::string& path, const std::string& body = "")

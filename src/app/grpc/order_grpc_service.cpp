@@ -77,16 +77,36 @@ grpc::Status OrderGrpcServiceImpl::ListOrders(
 
 grpc::Status OrderGrpcServiceImpl::GetOrder(
     grpc::ServerContext*,
-    const order_proto::GetOrderRequest*,
-    order_proto::GetOrderResponse*)
+    const order_proto::GetOrderRequest* request,
+    order_proto::GetOrderResponse* response)
 {
-    return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "GetOrder is not implemented yet");
+    if (request->order_id() <= 0) {
+        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "invalid order id");
+    }
+
+    auto order = service_.find_order(static_cast<int>(request->order_id()));
+    if (!order.has_value()) {
+        return grpc::Status(grpc::StatusCode::NOT_FOUND, "order not found");
+    }
+
+    fill_order(*order, response->mutable_order());
+    return grpc::Status::OK;
 }
 
 grpc::Status OrderGrpcServiceImpl::CancelOrder(
     grpc::ServerContext*,
-    const order_proto::CancelOrderRequest*,
-    order_proto::CancelOrderResponse*)
+    const order_proto::CancelOrderRequest* request,
+    order_proto::CancelOrderResponse* response)
 {
-    return grpc::Status(grpc::StatusCode::UNIMPLEMENTED, "CancelOrder is not implemented yet");
+    if (request->order_id() <= 0) {
+        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "invalid order id");
+    }
+
+    auto order = service_.cancel_order(static_cast<int>(request->order_id()));
+    if (!order.has_value()) {
+        return grpc::Status(grpc::StatusCode::NOT_FOUND, "order not found");
+    }
+
+    fill_order(*order, response->mutable_order());
+    return grpc::Status::OK;
 }

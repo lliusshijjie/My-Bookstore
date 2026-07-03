@@ -31,6 +31,19 @@ std::optional<int> GrpcInventoryClient::available_stock(int book_id) const
     return response.item().available();
 }
 
+std::optional<int> GrpcInventoryClient::add_stock(int book_id, int quantity)
+{
+    inventory_proto::InboundInventoryRequest request;
+    request.set_book_id(book_id);
+    request.set_quantity(quantity);
+
+    inventory_proto::InboundInventoryResponse response;
+    grpc::ClientContext context;
+    auto status = stub_->InboundInventory(&context, request, &response);
+    if (!status.ok()) return std::nullopt;
+    return response.item().available();
+}
+
 bool GrpcInventoryClient::reserve_stock(int book_id, int quantity)
 {
     return reserve_stock(next_reservation_id(), {InventoryMutation{book_id, quantity}});

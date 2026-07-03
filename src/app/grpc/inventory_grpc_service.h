@@ -16,6 +16,11 @@ public:
         const bookstore::inventory::v1::GetInventoryRequest* request,
         bookstore::inventory::v1::GetInventoryResponse* response) override;
 
+    grpc::Status InboundInventory(
+        grpc::ServerContext* context,
+        const bookstore::inventory::v1::InboundInventoryRequest* request,
+        bookstore::inventory::v1::InboundInventoryResponse* response) override;
+
     grpc::Status ReserveInventory(
         grpc::ServerContext* context,
         const bookstore::inventory::v1::ReserveInventoryRequest* request,

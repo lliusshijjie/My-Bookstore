@@ -19,6 +19,11 @@ public:
         return 10;
     }
 
+    std::optional<int> add_stock(int, int) override
+    {
+        return 10;
+    }
+
     bool reserve_stock(int, int) override
     {
         return false;
@@ -61,6 +66,16 @@ public:
     std::vector<Order> list_orders() const override
     {
         return {};
+    }
+
+    std::optional<Order> find_order(int) const override
+    {
+        return std::nullopt;
+    }
+
+    std::optional<Order> cancel_order(int) override
+    {
+        return std::nullopt;
     }
 };
 

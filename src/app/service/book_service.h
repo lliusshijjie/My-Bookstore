@@ -36,6 +36,35 @@ public:
         return repository_->find_book(book_id);
     }
 
+    std::optional<Book> create_book(const Book& book)
+    {
+        if (book.title.empty() || book.author.empty() || book.price_cents <= 0 ||
+            book.stock < 0) {
+            return std::nullopt;
+        }
+        Book created = book;
+        if (created.status.empty()) created.status = "active";
+        if (created.status != "active" && created.status != "inactive") {
+            return std::nullopt;
+        }
+        return repository_->create_book(created);
+    }
+
+    std::optional<Book> update_book(int book_id, const BookUpdate& update)
+    {
+        if (book_id <= 0) return std::nullopt;
+        if (update.title.has_value() && update.title->empty()) return std::nullopt;
+        if (update.author.has_value() && update.author->empty()) return std::nullopt;
+        if (update.price_cents.has_value() && *update.price_cents <= 0) return std::nullopt;
+        if (update.stock.has_value() && *update.stock < 0) return std::nullopt;
+        if (update.status.has_value() &&
+            *update.status != "active" &&
+            *update.status != "inactive") {
+            return std::nullopt;
+        }
+        return repository_->update_book(book_id, update);
+    }
+
     std::shared_ptr<BookRepository> repository() const
     {
         return repository_;

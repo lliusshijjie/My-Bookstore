@@ -59,12 +59,15 @@ int main()
         "service BookService",
         "rpc ListBooks",
         "rpc GetBook",
+        "rpc CreateBook",
+        "rpc UpdateBook",
         "message Book",
     });
 
     assert_proto("proto/inventory/v1/inventory.proto", "bookstore.inventory.v1", {
         "service InventoryService",
         "rpc GetInventory",
+        "rpc InboundInventory",
         "rpc ReserveInventory",
         "rpc ReleaseInventory",
     });

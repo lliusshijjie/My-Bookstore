@@ -32,6 +32,13 @@
       <div class="section-head">
         <h2 id="catalog-heading">书目</h2>
         <p class="section-desc">浏览在售图书，加入购物袋后结算下单。</p>
+        <form id="search-form" class="search-bar" role="search">
+          <label class="search-label" for="search-input">搜索图书</label>
+          <input id="search-input" class="search-input" type="search" name="q"
+                 placeholder="按书名或作者搜索" autocomplete="off" enterkeyhint="search">
+          <button type="button" class="btn btn-ghost search-clear hidden" id="search-clear">清除</button>
+        </form>
+        <p id="search-status" class="search-status hidden" aria-live="polite"></p>
       </div>
       <div id="book-grid" class="book-grid" role="list"></div>
       <p id="catalog-empty" class="empty-state hidden">暂无在售图书</p>

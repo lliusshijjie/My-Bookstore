@@ -29,6 +29,32 @@ int main()
     assert(get_status.ok());
     assert(get_response.book().title() == "Distributed C++");
 
+    bookstore::book::v1::CreateBookRequest create_book_request;
+    create_book_request.mutable_book()->set_title("Backend APIs");
+    create_book_request.mutable_book()->set_author("Backend Team");
+    create_book_request.mutable_book()->set_price_cents(7200);
+    create_book_request.mutable_book()->set_stock(3);
+    create_book_request.mutable_book()->set_status(bookstore::book::v1::BOOK_STATUS_ACTIVE);
+    bookstore::book::v1::CreateBookResponse create_book_response;
+    auto create_book_status = book_service.CreateBook(
+        nullptr, &create_book_request, &create_book_response);
+    assert(create_book_status.ok());
+    assert(create_book_response.book().book_id() > 0);
+
+    bookstore::book::v1::UpdateBookRequest update_book_request;
+    update_book_request.set_book_id(11);
+    update_book_request.mutable_book()->set_title("Distributed C++");
+    update_book_request.mutable_book()->set_author("Backend Team");
+    update_book_request.mutable_book()->set_price_cents(8300);
+    update_book_request.mutable_book()->set_stock(8);
+    update_book_request.mutable_book()->set_status(bookstore::book::v1::BOOK_STATUS_INACTIVE);
+    bookstore::book::v1::UpdateBookResponse update_book_response;
+    auto update_book_status = book_service.UpdateBook(
+        nullptr, &update_book_request, &update_book_response);
+    assert(update_book_status.ok());
+    assert(update_book_response.book().price_cents() == 8300);
+    assert(update_book_response.book().status() == bookstore::book::v1::BOOK_STATUS_INACTIVE);
+
     UserGrpcServiceImpl user_service(UserService(std::make_shared<MemoryUserRepository>()));
 
     bookstore::user::v1::RegisterRequest register_request;

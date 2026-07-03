@@ -158,6 +158,97 @@ std::optional<Book> MysqlBookRepository::find_book(int book_id) const
     return book_from_row(row);
 }
 
+std::optional<Book> MysqlBookRepository::create_book(const Book& book)
+{
+    if (pool_ == nullptr || book.title.empty() || book.author.empty() ||
+        book.price_cents <= 0 || book.stock < 0) {
+        return std::nullopt;
+    }
+
+    MYSQL* mysql = nullptr;
+    connectionRAII connection(&mysql, pool_);
+    if (mysql == nullptr) return std::nullopt;
+
+    const auto escaped_title = escape_sql(mysql, book.title);
+    const auto escaped_author = escape_sql(mysql, book.author);
+    const auto escaped_status = escape_sql(mysql, book.status.empty() ? "active" : book.status);
+
+    if (mysql_query(mysql, "START TRANSACTION") != 0) return std::nullopt;
+    const std::string insert_book =
+        "INSERT INTO books(title,author,price_cents,stock,status) VALUES('" +
+        escaped_title + "', '" + escaped_author + "', " +
+        std::to_string(book.price_cents) + ", " + std::to_string(book.stock) +
+        ", '" + escaped_status + "')";
+    if (mysql_query(mysql, insert_book.c_str()) != 0) {
+        mysql_query(mysql, "ROLLBACK");
+        return std::nullopt;
+    }
+
+    const int book_id = static_cast<int>(mysql_insert_id(mysql));
+    const std::string insert_inventory =
+        "INSERT INTO inventory(book_id,available) VALUES(" + std::to_string(book_id) +
+        ", " + std::to_string(book.stock) + ")";
+    if (mysql_query(mysql, insert_inventory.c_str()) != 0) {
+        mysql_query(mysql, "ROLLBACK");
+        return std::nullopt;
+    }
+
+    if (mysql_query(mysql, "COMMIT") != 0) {
+        mysql_query(mysql, "ROLLBACK");
+        return std::nullopt;
+    }
+
+    return find_book(book_id);
+}
+
+std::optional<Book> MysqlBookRepository::update_book(int book_id, const BookUpdate& update)
+{
+    if (pool_ == nullptr || book_id <= 0) return std::nullopt;
+
+    MYSQL* mysql = nullptr;
+    connectionRAII connection(&mysql, pool_);
+    if (mysql == nullptr) return std::nullopt;
+
+    std::vector<std::string> assignments;
+    if (update.title.has_value()) {
+        assignments.push_back("title='" + escape_sql(mysql, *update.title) + "'");
+    }
+    if (update.author.has_value()) {
+        assignments.push_back("author='" + escape_sql(mysql, *update.author) + "'");
+    }
+    if (update.price_cents.has_value()) {
+        assignments.push_back("price_cents=" + std::to_string(*update.price_cents));
+    }
+    if (update.stock.has_value()) {
+        assignments.push_back("stock=" + std::to_string(*update.stock));
+    }
+    if (update.status.has_value()) {
+        assignments.push_back("status='" + escape_sql(mysql, *update.status) + "'");
+    }
+
+    if (assignments.empty()) return find_book(book_id);
+
+    std::string sql = "UPDATE books SET ";
+    for (std::size_t i = 0; i < assignments.size(); ++i) {
+        if (i != 0) sql += ",";
+        sql += assignments[i];
+    }
+    sql += " WHERE id=" + std::to_string(book_id);
+    if (mysql_query(mysql, sql.c_str()) != 0 || mysql_affected_rows(mysql) == 0) {
+        return std::nullopt;
+    }
+
+    if (update.stock.has_value()) {
+        const std::string stock_sql =
+            "INSERT INTO inventory(book_id,available) VALUES(" + std::to_string(book_id) +
+            ", " + std::to_string(*update.stock) +
+            ") ON DUPLICATE KEY UPDATE available=VALUES(available)";
+        if (mysql_query(mysql, stock_sql.c_str()) != 0) return std::nullopt;
+    }
+
+    return find_book(book_id);
+}
+
 MysqlInventoryRepository::MysqlInventoryRepository(connection_pool* pool)
     : pool_(pool)
 {
@@ -181,6 +272,58 @@ std::optional<int> MysqlInventoryRepository::available_stock(int book_id) const
     MYSQL_ROW row = mysql_fetch_row(result.get());
     if (row == nullptr) return std::nullopt;
     return row[0] ? std::atoi(row[0]) : 0;
+}
+
+std::optional<int> MysqlInventoryRepository::add_stock(int book_id, int quantity)
+{
+    if (pool_ == nullptr || book_id <= 0 || quantity <= 0) return std::nullopt;
+
+    MYSQL* mysql = nullptr;
+    connectionRAII connection(&mysql, pool_);
+    if (mysql == nullptr) return std::nullopt;
+
+    if (mysql_query(mysql, "START TRANSACTION") != 0) return std::nullopt;
+    const std::string update_inventory =
+        "UPDATE inventory SET available=available+" + std::to_string(quantity) +
+        " WHERE book_id=" + std::to_string(book_id);
+    if (mysql_query(mysql, update_inventory.c_str()) != 0 ||
+        mysql_affected_rows(mysql) != 1) {
+        mysql_query(mysql, "ROLLBACK");
+        return std::nullopt;
+    }
+
+    const std::string update_book =
+        "UPDATE books SET stock=stock+" + std::to_string(quantity) +
+        " WHERE id=" + std::to_string(book_id);
+    if (mysql_query(mysql, update_book.c_str()) != 0) {
+        mysql_query(mysql, "ROLLBACK");
+        return std::nullopt;
+    }
+
+    const std::string select_sql =
+        "SELECT available FROM inventory WHERE book_id=" + std::to_string(book_id);
+    if (mysql_query(mysql, select_sql.c_str()) != 0) {
+        mysql_query(mysql, "ROLLBACK");
+        return std::nullopt;
+    }
+    auto result = store_result(mysql);
+    if (!result) {
+        mysql_query(mysql, "ROLLBACK");
+        return std::nullopt;
+    }
+    MYSQL_ROW row = mysql_fetch_row(result.get());
+    if (row == nullptr) {
+        mysql_query(mysql, "ROLLBACK");
+        return std::nullopt;
+    }
+    const int available = row[0] ? std::atoi(row[0]) : 0;
+    result.reset();
+
+    if (mysql_query(mysql, "COMMIT") != 0) {
+        mysql_query(mysql, "ROLLBACK");
+        return std::nullopt;
+    }
+    return available;
 }
 
 bool MysqlInventoryRepository::reserve_stock(int book_id, int quantity)
@@ -465,4 +608,48 @@ std::vector<Order> MysqlOrderRepository::list_orders() const
         order.items = fetch_order_items(mysql, order.id);
     }
     return orders;
+}
+
+std::optional<Order> MysqlOrderRepository::find_order(int order_id) const
+{
+    if (pool_ == nullptr || order_id <= 0) return std::nullopt;
+
+    MYSQL* mysql = nullptr;
+    connectionRAII connection(&mysql, pool_);
+    if (mysql == nullptr) return std::nullopt;
+
+    const std::string sql =
+        "SELECT id,user_id,status,total_cents FROM orders WHERE id=" +
+        std::to_string(order_id) + " LIMIT 1";
+    if (mysql_query(mysql, sql.c_str()) != 0) return std::nullopt;
+
+    auto result = store_result(mysql);
+    if (!result) return std::nullopt;
+
+    MYSQL_ROW row = mysql_fetch_row(result.get());
+    if (row == nullptr) return std::nullopt;
+
+    Order order;
+    order.id = row[0] ? std::atoi(row[0]) : 0;
+    order.user_id = row[1] ? std::atoi(row[1]) : 0;
+    order.status = row[2] ? row[2] : "";
+    order.total_cents = row[3] ? std::atoi(row[3]) : 0;
+    result.reset();
+    order.items = fetch_order_items(mysql, order.id);
+    return order;
+}
+
+std::optional<Order> MysqlOrderRepository::cancel_order(int order_id)
+{
+    if (pool_ == nullptr || order_id <= 0) return std::nullopt;
+
+    MYSQL* mysql = nullptr;
+    connectionRAII connection(&mysql, pool_);
+    if (mysql == nullptr) return std::nullopt;
+
+    const std::string sql =
+        "UPDATE orders SET status='cancelled' WHERE id=" + std::to_string(order_id) +
+        " AND status<>'cancelled'";
+    if (mysql_query(mysql, sql.c_str()) != 0) return std::nullopt;
+    return find_order(order_id);
 }

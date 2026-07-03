@@ -8,8 +8,9 @@ through these Protobuf contracts.
 
 - `proto/common/v1/common.proto`: pagination and shared empty message.
 - `proto/user/v1/user.proto`: registration and login service.
-- `proto/book/v1/book.proto`: book listing and `GetBook`.
-- `proto/inventory/v1/inventory.proto`: stock query, reservation, and release.
+- `proto/book/v1/book.proto`: book listing, `GetBook`, creation, and update.
+- `proto/inventory/v1/inventory.proto`: stock query, inbound stock,
+  reservation, and release.
 - `proto/order/v1/order.proto`: order creation, listing, `GetOrder`, and
   `CancelOrder`.
 
@@ -81,10 +82,11 @@ The web gateway can call a remote inventory service by setting:
 export INVENTORY_GRPC_TARGET=127.0.0.1:50051
 ```
 
-With `INVENTORY_GRPC_TARGET` set, both `GET /api/inventory/books/{book_id}` and
-`POST /api/orders` use the inventory gRPC service. `ReserveInventory` is
-idempotent for an existing `reserved` reservation id, and `ReleaseInventory` is
-idempotent for an existing `released` reservation id.
+With `INVENTORY_GRPC_TARGET` set, `GET /api/inventory/books/{book_id}`,
+`POST /api/inventory/books/{book_id}/inbound`, and `POST /api/orders` use the
+inventory gRPC service. `ReserveInventory` is idempotent for an existing
+`reserved` reservation id, and `ReleaseInventory` is idempotent for an existing
+`released` reservation id.
 
 The user and book gRPC servers use their MySQL repositories directly:
 

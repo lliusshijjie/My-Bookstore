@@ -1,29 +1,30 @@
-# TinyWebServer Book Trade Platform
+# TinyWebServer Bookstore
 
-TinyWebServer is being evolved from a teaching web server into a C++ business
-backend for a simple book trading platform. The current architecture keeps the
-epoll/thread-pool HTTP server as the gateway, while user, book, inventory, and
-order capabilities are being split behind gRPC service boundaries.
+TinyWebServer is evolving into a C++17 bookstore backend. The project keeps the original epoll-based HTTP server and adds a business gateway, MySQL repositories, gRPC service boundaries, and a browser client for book browsing, search, carts, and orders.
 
-## Current Architecture
+## Architecture
 
 ```mermaid
 flowchart LR
-    Browser["Browser client"]
-    Gateway["Web Gateway\nC++ TinyWebServer\nHTTP JSON + static files"]
-    UserSvc["User Service\nC++ gRPC\n:50053"]
-    BookSvc["Book Service\nC++ gRPC\n:50054"]
-    InventorySvc["Inventory Service\nC++ gRPC\n:50051"]
-    OrderSvc["Order Service\nC++ gRPC\n:50052"]
-    MySQL[("MySQL\nqgydb")]
+    Client["client/\nBrowser UI"]
+    Gateway["Web Gateway\nHTTP JSON :9006"]
+    Search["Book Search\n/api/books/search"]
+    Recommend["Recommend Index\n/api/books/{id}/similar"]
+    UserSvc["User gRPC\n:50053"]
+    BookSvc["Book gRPC\n:50054"]
+    InventorySvc["Inventory gRPC\n:50051"]
+    OrderSvc["Order gRPC\n:50052"]
+    MySQL[("MySQL qgydb")]
 
-    Browser -->|"HTTP /api/*"| Gateway
-    Gateway -->|"Register/Login"| UserSvc
-    Gateway -->|"ListBooks"| BookSvc
-    Gateway -->|"GetInventory"| InventorySvc
-    Gateway -->|"Create/List Orders"| OrderSvc
-    OrderSvc -->|"GetBook"| BookSvc
-    OrderSvc -->|"Reserve/Release"| InventorySvc
+    Client -->|"HTTP /api/*"| Gateway
+    Gateway --> Search
+    Gateway --> Recommend
+    Gateway --> UserSvc
+    Gateway --> BookSvc
+    Gateway --> InventorySvc
+    Gateway --> OrderSvc
+    OrderSvc --> BookSvc
+    OrderSvc --> InventorySvc
 
     UserSvc --> MySQL
     BookSvc --> MySQL
@@ -33,18 +34,32 @@ flowchart LR
 
 ## Repository Layout
 
-- `client/`: static browser UI.
-- `src/core/`: server bootstrap, epoll loop, thread pool integration.
-- `src/net/http/`: HTTP request/response and router infrastructure.
-- `src/app/controller/`: HTTP handlers for gateway routes.
-- `src/app/client/`: local and gRPC client interfaces used between modules.
-- `src/app/service/`: business logic for users, books, inventory, and orders.
-- `src/app/repository/`: repository interfaces plus memory and MySQL DAO implementations.
-- `src/app/grpc/`: gRPC service implementations and standalone service entrypoints.
-- `proto/`: Protobuf contracts for backend-to-backend RPC.
-- `test/`: assert-based C++ tests driven by CTest.
+| Path | Purpose |
+|------|---------|
+| `client/` | Static browser client for catalog search, account, cart, checkout, and orders. |
+| `src/core/` | Server bootstrap, config, epoll loop, timer, and thread integration. |
+| `src/net/http/` | HTTP parser, response model, router, URL params, and static file handling. |
+| `src/app/controller/` | HTTP handlers for auth, books, inventory, orders, and recommendations. |
+| `src/app/service/` | Business services that keep controllers thin. |
+| `src/app/repository/` | Repository interfaces plus `memory/` test repositories and `mysql/` DAO implementations. |
+| `src/app/client/` | Local and gRPC client abstractions used between services. |
+| `src/app/grpc/` | gRPC service implementations and standalone service entrypoints. |
+| `src/app/recommend/` | Lightweight book vector index for similar-book recommendations. |
+| `proto/` | Protobuf contracts for user, book, inventory, and order services. |
+| `scripts/init.sql` | MySQL schema and seed data. |
+| `test/` | CTest-driven C++ tests. |
 
 ## Build And Test
+
+Install dependencies on Ubuntu 20.04 / WSL2:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y cmake g++ libmysqlclient-dev libgrpc++-dev \
+  libprotobuf-dev pkg-config protobuf-compiler protobuf-compiler-grpc
+```
+
+Build and run tests:
 
 ```bash
 cmake -S . -B build -DBUILD_TESTS=ON
@@ -52,45 +67,63 @@ cmake --build build -j$(nproc)
 cd build && ctest --output-on-failure
 ```
 
-Generate and validate Protobuf contracts:
+Validate generated RPC contracts and the Makefile path:
 
 ```bash
-make proto-check
-make grpc-stubs
 cmake --build build --target check_proto_contracts
+make grpc-stubs
+make server
 ```
 
-Run the Docker Compose service chain:
+## Run Locally
+
+Start the full service chain with Docker Compose:
 
 ```bash
 cd deploy/docker
 docker compose up -d --build mysql user-service book-service inventory-service order-service server
 ```
 
-## Runtime Configuration
+Open `http://localhost:9006/index.html`.
 
-The gateway uses MySQL repositories by default after `WebServer::sql_pool()`.
-Set these variables to route HTTP requests to remote gRPC services:
+For local binaries, initialize MySQL once and run from the repository root so static assets resolve correctly:
 
 ```bash
-USER_GRPC_TARGET=127.0.0.1:50053
-BOOK_GRPC_TARGET=127.0.0.1:50054
-INVENTORY_GRPC_TARGET=127.0.0.1:50051
-ORDER_GRPC_TARGET=127.0.0.1:50052
+mysql -uroot -proot < scripts/init.sql
+./build/server -p 9006
 ```
 
-Service DB variables follow the same pattern: `USER_DB_HOST`, `BOOK_DB_HOST`,
-`INVENTORY_DB_HOST`, `ORDER_DB_HOST`, plus `_PORT`, `_USER`, `_PASSWORD`,
-`_NAME`, and `_POOL_SIZE`.
+Set these variables when the gateway should call standalone gRPC services:
 
-## Implemented HTTP APIs
+```bash
+export USER_GRPC_TARGET=127.0.0.1:50053
+export BOOK_GRPC_TARGET=127.0.0.1:50054
+export INVENTORY_GRPC_TARGET=127.0.0.1:50051
+export ORDER_GRPC_TARGET=127.0.0.1:50052
+```
+
+## HTTP API
+
+Responses use `{"code":0,"message":"ok","data":...}`. See [docs/ecommerce_api.md](docs/ecommerce_api.md) for request and response details.
 
 ```text
 GET  /api/health
 POST /api/auth/register
 POST /api/auth/login
 GET  /api/books
+GET  /api/books/{book_id}
+GET  /api/books/search?q=keyword
+GET  /api/books/{book_id}/similar
+POST /api/books
+PATCH /api/books/{book_id}
 GET  /api/inventory/books/{book_id}
+POST /api/inventory/books/{book_id}/inbound
 POST /api/orders
 GET  /api/orders
+GET  /api/orders/{order_id}
+POST /api/orders/{order_id}/cancel
 ```
+
+## CI
+
+GitHub Actions runs on pushes and pull requests. The workflow installs C++/MySQL/gRPC/Protobuf dependencies, configures CMake with tests, builds all targets, validates Protobuf contracts, runs CTest, checks gRPC stub generation, and verifies the Makefile server build.

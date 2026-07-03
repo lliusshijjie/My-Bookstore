@@ -3,6 +3,7 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
@@ -40,6 +41,13 @@ jobs:
           CTEST_OUTPUT_ON_FAILURE: "1"
         working-directory: ci-build
         run: ctest --output-on-failure
+
+      - name: Validate client search assets
+        run: |
+          test -f client/index.html
+          test -f client/js/api.js
+          test -f client/js/app.js
+          grep -R "/api/books/search" client/js client/index.html
 
       - name: Validate Makefile gRPC stub generation
         run: |

@@ -25,6 +25,11 @@ public:
         return service_.available_stock(book_id);
     }
 
+    std::optional<int> add_stock(int book_id, int quantity) override
+    {
+        return service_.add_stock(book_id, quantity);
+    }
+
     bool reserve_stock(int book_id, int quantity) override
     {
         return service_.reserve_stock(book_id, quantity);

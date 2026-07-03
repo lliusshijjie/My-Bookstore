@@ -9,6 +9,8 @@ option cc_enable_arenas = true;
 service BookService {
   rpc ListBooks(ListBooksRequest) returns (ListBooksResponse);
   rpc GetBook(GetBookRequest) returns (GetBookResponse);
+  rpc CreateBook(CreateBookRequest) returns (CreateBookResponse);
+  rpc UpdateBook(UpdateBookRequest) returns (UpdateBookResponse);
 }
 
 enum BookStatus {
@@ -41,5 +43,22 @@ message GetBookRequest {
 }
 
 message GetBookResponse {
+  Book book = 1;
+}
+
+message CreateBookRequest {
+  Book book = 1;
+}
+
+message CreateBookResponse {
+  Book book = 1;
+}
+
+message UpdateBookRequest {
+  int64 book_id = 1;
+  Book book = 2;
+}
+
+message UpdateBookResponse {
   Book book = 1;
 }

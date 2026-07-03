@@ -32,6 +32,12 @@ public:
         return repository_->available_stock(book_id);
     }
 
+    std::optional<int> add_stock(int book_id, int quantity)
+    {
+        if (book_id <= 0 || quantity <= 0) return std::nullopt;
+        return repository_->add_stock(book_id, quantity);
+    }
+
     bool reserve_stock(int book_id, int quantity)
     {
         return repository_->reserve_stock(book_id, quantity);

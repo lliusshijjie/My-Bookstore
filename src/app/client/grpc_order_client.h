@@ -17,6 +17,8 @@ public:
         int user_id,
         const std::vector<OrderItemRequest>& items) override;
     std::vector<Order> list_orders() const override;
+    std::optional<Order> find_order(int order_id) const override;
+    std::optional<Order> cancel_order(int order_id) override;
 
 private:
     std::shared_ptr<bookstore::order::v1::OrderService::Stub> stub_;

@@ -29,6 +29,9 @@ var Api = (function () {
       return request('POST', '/api/auth/login', { username: username, password: password });
     },
     books: function () { return request('GET', '/api/books'); },
+    searchBooks: function (query) {
+      return request('GET', '/api/books/search?q=' + encodeURIComponent(query));
+    },
     inventory: function (bookId) {
       return request('GET', '/api/inventory/books/' + bookId);
     },

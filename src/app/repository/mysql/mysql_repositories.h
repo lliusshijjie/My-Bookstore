@@ -26,6 +26,8 @@ public:
 
     std::vector<Book> list_books() const override;
     std::optional<Book> find_book(int book_id) const override;
+    std::optional<Book> create_book(const Book& book) override;
+    std::optional<Book> update_book(int book_id, const BookUpdate& update) override;
 
 private:
     connection_pool* pool_{nullptr};
@@ -36,6 +38,7 @@ public:
     explicit MysqlInventoryRepository(connection_pool* pool);
 
     std::optional<int> available_stock(int book_id) const override;
+    std::optional<int> add_stock(int book_id, int quantity) override;
     bool reserve_stock(int book_id, int quantity) override;
     void release_stock(int book_id, int quantity) override;
     bool reserve_stock(const std::string& reservation_id,
@@ -55,6 +58,8 @@ public:
                                       const std::vector<OrderItem>& items,
                                       int total_cents) override;
     std::vector<Order> list_orders() const override;
+    std::optional<Order> find_order(int order_id) const override;
+    std::optional<Order> cancel_order(int order_id) override;
 
 private:
     connection_pool* pool_{nullptr};

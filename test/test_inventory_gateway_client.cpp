@@ -18,6 +18,12 @@ public:
         return std::nullopt;
     }
 
+    std::optional<int> add_stock(int book_id, int quantity) override
+    {
+        if (book_id == 42 && quantity > 0) return 7 + quantity;
+        return std::nullopt;
+    }
+
     bool reserve_stock(int, int) override
     {
         return false;

@@ -23,6 +23,18 @@ void fill_book(const Book& source, book_proto::Book* target)
     target->set_status(status_to_proto(source.status));
 }
 
+Book book_from_proto(const book_proto::Book& source)
+{
+    Book book;
+    book.id = static_cast<int>(source.book_id());
+    book.title = source.title();
+    book.author = source.author();
+    book.price_cents = static_cast<int>(source.price_cents());
+    book.stock = source.stock();
+    book.status = source.status() == book_proto::BOOK_STATUS_INACTIVE ? "inactive" : "active";
+    return book;
+}
+
 }  // namespace
 
 BookGrpcServiceImpl::BookGrpcServiceImpl(BookService service)
@@ -57,6 +69,46 @@ grpc::Status BookGrpcServiceImpl::GetBook(
     auto book = service_.find_book(static_cast<int>(request->book_id()));
     if (!book.has_value()) {
         return grpc::Status(grpc::StatusCode::NOT_FOUND, "book not found");
+    }
+
+    fill_book(*book, response->mutable_book());
+    return grpc::Status::OK;
+}
+
+grpc::Status BookGrpcServiceImpl::CreateBook(
+    grpc::ServerContext*,
+    const book_proto::CreateBookRequest* request,
+    book_proto::CreateBookResponse* response)
+{
+    auto book = service_.create_book(book_from_proto(request->book()));
+    if (!book.has_value()) {
+        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "invalid book request");
+    }
+
+    fill_book(*book, response->mutable_book());
+    return grpc::Status::OK;
+}
+
+grpc::Status BookGrpcServiceImpl::UpdateBook(
+    grpc::ServerContext*,
+    const book_proto::UpdateBookRequest* request,
+    book_proto::UpdateBookResponse* response)
+{
+    if (request->book_id() <= 0) {
+        return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "invalid book id");
+    }
+
+    const auto source = request->book();
+    BookUpdate update;
+    update.title = source.title();
+    update.author = source.author();
+    update.price_cents = static_cast<int>(source.price_cents());
+    update.stock = source.stock();
+    update.status = source.status() == book_proto::BOOK_STATUS_INACTIVE ? "inactive" : "active";
+
+    auto book = service_.update_book(static_cast<int>(request->book_id()), update);
+    if (!book.has_value()) {
+        return grpc::Status(grpc::StatusCode::NOT_FOUND, "book not found or invalid");
     }
 
     fill_book(*book, response->mutable_book());

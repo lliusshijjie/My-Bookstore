@@ -72,7 +72,48 @@ public:
         return std::nullopt;
     }
 
+    std::optional<Book> create_book(const Book& book) override
+    {
+        if (book.title.empty() || book.author.empty() || book.price_cents <= 0 ||
+            book.stock < 0) {
+            return std::nullopt;
+        }
+
+        std::lock_guard<std::mutex> lock(mutex_);
+        Book created = book;
+        created.id = next_book_id();
+        if (created.status.empty()) created.status = "active";
+        books_.push_back(created);
+        return created;
+    }
+
+    std::optional<Book> update_book(int book_id, const BookUpdate& update) override
+    {
+        if (book_id <= 0) return std::nullopt;
+
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (auto& book : books_) {
+            if (book.id != book_id) continue;
+            if (update.title.has_value()) book.title = *update.title;
+            if (update.author.has_value()) book.author = *update.author;
+            if (update.price_cents.has_value()) book.price_cents = *update.price_cents;
+            if (update.stock.has_value()) book.stock = *update.stock;
+            if (update.status.has_value()) book.status = *update.status;
+            return book;
+        }
+        return std::nullopt;
+    }
+
 private:
+    int next_book_id() const
+    {
+        int next = 1;
+        for (const auto& book : books_) {
+            if (book.id >= next) next = book.id + 1;
+        }
+        return next;
+    }
+
     mutable std::mutex mutex_;
     std::vector<Book> books_;
 };
@@ -94,6 +135,15 @@ public:
         auto it = stock_.find(book_id);
         if (it == stock_.end()) return std::nullopt;
         return it->second;
+    }
+
+    std::optional<int> add_stock(int book_id, int quantity) override
+    {
+        if (book_id <= 0 || quantity <= 0) return std::nullopt;
+
+        std::lock_guard<std::mutex> lock(mutex_);
+        stock_[book_id] += quantity;
+        return stock_[book_id];
     }
 
     bool reserve_stock(int book_id, int quantity) override
@@ -172,6 +222,28 @@ public:
     {
         std::lock_guard<std::mutex> lock(mutex_);
         return orders_;
+    }
+
+    std::optional<Order> find_order(int order_id) const override
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (const auto& order : orders_) {
+            if (order.id == order_id) return order;
+        }
+        return std::nullopt;
+    }
+
+    std::optional<Order> cancel_order(int order_id) override
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (auto& order : orders_) {
+            if (order.id != order_id) continue;
+            if (order.status != "cancelled") {
+                order.status = "cancelled";
+            }
+            return order;
+        }
+        return std::nullopt;
     }
 
 private:

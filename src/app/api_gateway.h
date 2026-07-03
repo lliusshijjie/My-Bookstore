@@ -4,6 +4,7 @@
 #include "src/app/controller/book_controller.h"
 #include "src/app/controller/inventory_controller.h"
 #include "src/app/controller/order_controller.h"
+#include "src/app/controller/recommend_controller.h"
 #include "src/app/client/book_client.h"
 #include "src/app/client/inventory_client.h"
 #include "src/app/client/local_book_client.h"
@@ -20,6 +21,7 @@
 #include "src/app/repository/user_repository.h"
 #include "src/app/service/inventory_service.h"
 #include "src/app/service/order_service.h"
+#include "src/app/service/recommend_service.h"
 #include "src/app/service/user_service.h"
 #include "src/net/http/http_request.h"
 #include "src/net/http/http_response.h"
@@ -53,7 +55,8 @@ public:
           user_service_(dependencies_.users),
           book_service_(dependencies_.books),
           inventory_service_(dependencies_.inventory),
-          order_service_(dependencies_.books, dependencies_.inventory_client, dependencies_.orders)
+          order_service_(dependencies_.books, dependencies_.inventory_client, dependencies_.orders),
+          recommend_service_(nullptr)
     {
         ensure_user_client();
         ensure_book_client();
@@ -63,6 +66,7 @@ public:
             dependencies_.book_client,
             dependencies_.inventory_client,
             dependencies_.orders);
+        recommend_service_.set_book_client(dependencies_.book_client);
         register_routes();
     }
 
@@ -80,6 +84,7 @@ public:
             dependencies_.book_client,
             dependencies_.inventory_client,
             dependencies_.orders);
+        recommend_service_.set_book_client(dependencies_.book_client);
     }
 
     std::optional<HttpResponse> dispatch(const HttpRequest& request) const
@@ -151,7 +156,7 @@ private:
         if (!dependencies_.order_client) {
             dependencies_.order_client = std::make_shared<LocalOrderClient>(
                 OrderService(
-                    dependencies_.books,
+                    dependencies_.book_client,
                     dependencies_.inventory_client,
                     dependencies_.orders));
         }
@@ -169,6 +174,27 @@ private:
             [this](const HttpRequest& request) {
                 return handle_list_books(request, *dependencies_.book_client);
             });
+        router_.add_route(HttpMethod::Get, "/api/books/{book_id}",
+            [this](const HttpRequest& request) {
+                return handle_get_book(request, *dependencies_.book_client);
+            });
+        router_.add_route(HttpMethod::Post, "/api/books",
+            [this](const HttpRequest& request) {
+                return handle_create_book(request, *dependencies_.book_client);
+            });
+        router_.add_route(HttpMethod::Patch, "/api/books/{book_id}",
+            [this](const HttpRequest& request) {
+                return handle_update_book(request, *dependencies_.book_client);
+            });
+        router_.add_route(HttpMethod::Get, "/api/books/search",
+            [this](const HttpRequest& request) {
+                return handle_search_books(request, *dependencies_.book_client);
+            });
+        router_.add_route(HttpMethod::Get, "/api/books/{book_id}/similar",
+            [this](const HttpRequest& request) {
+                recommend_service_.rebuild();
+                return handle_similar_books(request, recommend_service_);
+            });
         router_.add_route(HttpMethod::Post, "/api/auth/register",
             [this](const HttpRequest& request) {
                 return handle_register_user(request, *dependencies_.user_client);
@@ -181,6 +207,10 @@ private:
             [this](const HttpRequest& request) {
                 return handle_get_inventory(request, *dependencies_.inventory_client);
             });
+        router_.add_route(HttpMethod::Post, "/api/inventory/books/{book_id}/inbound",
+            [this](const HttpRequest& request) {
+                return handle_add_inventory(request, *dependencies_.inventory_client);
+            });
         router_.add_route(HttpMethod::Post, "/api/orders",
             [this](const HttpRequest& request) {
                 return handle_create_order(request, *dependencies_.order_client);
@@ -189,6 +219,14 @@ private:
             [this](const HttpRequest& request) {
                 return handle_list_orders(request, *dependencies_.order_client);
             });
+        router_.add_route(HttpMethod::Get, "/api/orders/{order_id}",
+            [this](const HttpRequest& request) {
+                return handle_get_order(request, *dependencies_.order_client);
+            });
+        router_.add_route(HttpMethod::Post, "/api/orders/{order_id}/cancel",
+            [this](const HttpRequest& request) {
+                return handle_cancel_order(request, *dependencies_.order_client);
+            });
     }
 
     Dependencies dependencies_;
@@ -196,5 +234,6 @@ private:
     BookService book_service_;
     InventoryService inventory_service_;
     OrderService order_service_;
+    RecommendService recommend_service_;
     Router router_;
 };

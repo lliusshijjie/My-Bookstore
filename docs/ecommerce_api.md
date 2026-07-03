@@ -99,6 +99,54 @@ Lists active books from the current book module or remote book gRPC service.
 Response `200 OK` includes `id`, `title`, `author`, `price_cents`, `stock`, and
 `status` for each book.
 
+### GET /api/books/{book_id}
+
+Fetches one book by id. Returns `404 Not Found` when the book does not exist.
+
+### GET /api/books/search?q=keyword
+
+Searches active books by title or author using a simple case-insensitive match.
+
+### GET /api/books/{book_id}/similar
+
+Returns active books that are closest to the source book in the local
+book-vector index. Returns `404 Not Found` when the source book does not exist.
+
+Response `200 OK`:
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "book_id": 2,
+    "books": []
+  }
+}
+
+```
+
+### POST /api/books
+
+Creates a book and initial inventory.
+
+Request:
+
+```json
+{
+  "title": "Clean Architecture",
+  "author": "Robert Martin",
+  "price_cents": 7600,
+  "stock": 6,
+  "status": "active"
+}
+```
+
+### PATCH /api/books/{book_id}
+
+Updates book fields. Supported fields are `title`, `author`, `price_cents`,
+`stock`, and `status`. When `stock` is updated, MySQL inventory is synchronized.
+
 ### GET /api/inventory/books/{book_id}
 
 Queries available stock for one book.
@@ -113,6 +161,18 @@ Response `200 OK`:
     "book_id": 1,
     "available": 12
   }
+}
+```
+
+### POST /api/inventory/books/{book_id}/inbound
+
+Adds stock for one book.
+
+Request:
+
+```json
+{
+  "quantity": 5
 }
 ```
 
@@ -160,6 +220,16 @@ invalid.
 
 Lists orders from the local order module or remote order gRPC service.
 
+### GET /api/orders/{order_id}
+
+Fetches one order with its items.
+
+### POST /api/orders/{order_id}/cancel
+
+Cancels an existing order and releases the reserved item quantities back to
+inventory. Repeating the cancel request returns the cancelled order without
+releasing stock again.
+
 ## Database Schema
 
 `scripts/init.sql` creates the local MySQL schema used by Docker Compose:
@@ -177,24 +247,16 @@ The repository layer has two implementations:
 - `src/app/repository/mysql/`: MySQL DAO implementation used by `WebServer` and
   standalone gRPC service processes after `connection_pool` is initialized.
 
-## Planned APIs
-
-- `GET /api/books/{book_id}`: fetch one book.
-- `POST /api/books`: create a book record for admin users.
-- `PATCH /api/books/{book_id}`: update price, title, category, or status.
-- `POST /api/inventory/books/{book_id}/inbound`: add stock.
-- `POST /api/inventory/books/{book_id}/reserve`: reserve stock before order creation.
-- `GET /api/orders/{order_id}`: fetch order details.
-- `POST /api/orders/{order_id}/cancel`: cancel an unpaid order and release stock.
-
 The current gRPC boundaries are:
 
 - `user_grpc_server`: `Register` and `Login`, backed by `MysqlUserRepository`.
-- `book_grpc_server`: `ListBooks` and `GetBook`, backed by `MysqlBookRepository`.
-- `inventory_grpc_server`: `GetInventory`, `ReserveInventory`, and
+- `book_grpc_server`: `ListBooks`, `GetBook`, `CreateBook`, and `UpdateBook`,
+  backed by `MysqlBookRepository`.
+- `inventory_grpc_server`: `GetInventory`, `InboundInventory`, `ReserveInventory`, and
   `ReleaseInventory`, backed by `MysqlInventoryRepository`.
-- `order_grpc_server`: `CreateOrder` and `ListOrders`, backed by
-  `MysqlOrderRepository`; it calls book and inventory through gRPC.
+- `order_grpc_server`: `CreateOrder`, `ListOrders`, `GetOrder`, and
+  `CancelOrder`, backed by `MysqlOrderRepository`; it calls book and inventory
+  through gRPC.
 
 Set `USER_GRPC_TARGET`, `BOOK_GRPC_TARGET`, `INVENTORY_GRPC_TARGET`, and
 `ORDER_GRPC_TARGET` to route gateway calls to remote services.

@@ -3,6 +3,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 
 // 解析 application/x-www-form-urlencoded 请求体中的单个参数
 // 请求体格式: "key1=value1&key2=value2"
@@ -33,4 +34,40 @@ inline std::optional<std::string> get_param(std::string_view body,
         pos = amp + 1;
     }
     return std::nullopt;
+}
+
+inline std::unordered_map<std::string, std::string> parse_query_string(std::string_view query)
+{
+    std::unordered_map<std::string, std::string> params;
+    std::size_t pos = 0;
+    while (pos < query.size()) {
+        std::size_t amp = query.find('&', pos);
+        std::string_view token = (amp == std::string_view::npos)
+                                     ? query.substr(pos)
+                                     : query.substr(pos, amp - pos);
+        std::size_t eq = token.find('=');
+        if (eq != std::string_view::npos) {
+            params.emplace(std::string(token.substr(0, eq)),
+                           std::string(token.substr(eq + 1)));
+        }
+        if (amp == std::string_view::npos) {
+            break;
+        }
+        pos = amp + 1;
+    }
+    return params;
+}
+
+inline void split_path_and_query(const std::string& url,
+                                 std::string& path,
+                                 std::unordered_map<std::string, std::string>& query_params)
+{
+    std::size_t qpos = url.find('?');
+    if (qpos == std::string::npos) {
+        path = url;
+        query_params.clear();
+        return;
+    }
+    path = url.substr(0, qpos);
+    query_params = parse_query_string(url.substr(qpos + 1));
 }

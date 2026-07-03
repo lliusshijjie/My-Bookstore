@@ -57,3 +57,35 @@ inline HttpResponse handle_list_orders(const HttpRequest&, const OrderClient& cl
     out << "]}}";
     return HttpResponse::json(200, out.str());
 }
+
+inline HttpResponse handle_get_order(const HttpRequest& request, const OrderClient& client)
+{
+    auto it = request.path_params.find("order_id");
+    if (it == request.path_params.end()) {
+        return HttpResponse::json(400, "{\"code\":400,\"message\":\"missing order_id\",\"data\":null}");
+    }
+
+    auto order = client.find_order(std::atoi(it->second.c_str()));
+    if (!order.has_value()) {
+        return HttpResponse::json(404, "{\"code\":404,\"message\":\"order not found\",\"data\":null}");
+    }
+
+    return HttpResponse::json(200, "{\"code\":0,\"message\":\"ok\",\"data\":{\"order\":"
+        + order_to_json(*order) + "}}");
+}
+
+inline HttpResponse handle_cancel_order(const HttpRequest& request, OrderClient& client)
+{
+    auto it = request.path_params.find("order_id");
+    if (it == request.path_params.end()) {
+        return HttpResponse::json(400, "{\"code\":400,\"message\":\"missing order_id\",\"data\":null}");
+    }
+
+    auto order = client.cancel_order(std::atoi(it->second.c_str()));
+    if (!order.has_value()) {
+        return HttpResponse::json(404, "{\"code\":404,\"message\":\"order not found\",\"data\":null}");
+    }
+
+    return HttpResponse::json(200, "{\"code\":0,\"message\":\"ok\",\"data\":{\"order\":"
+        + order_to_json(*order) + "}}");
+}

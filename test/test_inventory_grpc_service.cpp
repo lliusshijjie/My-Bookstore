@@ -17,6 +17,12 @@ public:
         return std::nullopt;
     }
 
+    std::optional<int> add_stock(int book_id, int quantity) override
+    {
+        if (book_id == 1 && quantity > 0) return 12 + quantity;
+        return std::nullopt;
+    }
+
     bool reserve_stock(int, int) override
     {
         return false;
@@ -67,6 +73,14 @@ int main()
     auto get_status = service->GetInventory(nullptr, &get_request, &get_response);
     assert(get_status.ok());
     assert(get_response.item().available() == 12);
+
+    inventory_proto::InboundInventoryRequest inbound_request;
+    inbound_request.set_book_id(2);
+    inbound_request.set_quantity(5);
+    inventory_proto::InboundInventoryResponse inbound_response;
+    auto inbound_status = service->InboundInventory(nullptr, &inbound_request, &inbound_response);
+    assert(inbound_status.ok());
+    assert(inbound_response.item().available() == 9);
 
     inventory_proto::ReserveInventoryRequest reserve_request;
     auto* item = reserve_request.add_items();

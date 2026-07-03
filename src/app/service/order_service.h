@@ -97,6 +97,28 @@ public:
         return order_repository_->list_orders();
     }
 
+    std::optional<Order> find_order(int order_id) const
+    {
+        if (order_id <= 0) return std::nullopt;
+        return order_repository_->find_order(order_id);
+    }
+
+    std::optional<Order> cancel_order(int order_id)
+    {
+        if (order_id <= 0) return std::nullopt;
+
+        auto existing = order_repository_->find_order(order_id);
+        if (!existing.has_value()) return std::nullopt;
+        if (existing->status == "cancelled") return existing;
+
+        auto cancelled = order_repository_->cancel_order(order_id);
+        if (!cancelled.has_value()) return std::nullopt;
+        for (const auto& item : cancelled->items) {
+            inventory_client_->release_stock(item.book_id, item.quantity);
+        }
+        return cancelled;
+    }
+
 private:
     static std::string next_reservation_id(int user_id)
     {
