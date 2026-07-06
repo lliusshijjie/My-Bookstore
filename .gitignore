@@ -22,6 +22,7 @@ ServerLog/
 # CMake build directory
 build/
 build-*/
+ci-build-*/
 
 # Core dumps
 /core
