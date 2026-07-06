@@ -41,6 +41,7 @@ private:
         case 409: return "Conflict";
         case 500: return "Internal Server Error";
         case 501: return "Not Implemented";
+        case 503: return "Service Unavailable";
         default:  return "OK";
         }
     }

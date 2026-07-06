@@ -1,12 +1,250 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: redis
+  namespace: tinywebserver
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          command: ["redis-server", "--appendonly", "yes"]
+          ports:
+            - containerPort: 6379
+              name: redis
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-service
+  namespace: tinywebserver
+  labels:
+    app: inventory-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inventory-service
+  template:
+    metadata:
+      labels:
+        app: inventory-service
+    spec:
+      containers:
+        - name: inventory-service
+          image: tinywebserver:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/app/inventory_grpc_server"]
+          args: ["0.0.0.0:50051"]
+          ports:
+            - containerPort: 50051
+              name: grpc
+          env:
+            - name: INVENTORY_DB_HOST
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: MYSQL_HOST}}
+            - name: INVENTORY_DB_PORT
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: MYSQL_PORT}}
+            - name: INVENTORY_DB_NAME
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: MYSQL_DATABASE}}
+            - name: INVENTORY_DB_USER
+              valueFrom: {secretKeyRef: {name: mysql-secret, key: MYSQL_USER}}
+            - name: INVENTORY_DB_PASSWORD
+              valueFrom: {secretKeyRef: {name: mysql-secret, key: MYSQL_PASSWORD}}
+            - name: INVENTORY_DB_POOL_SIZE
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: SQL_POOL_SIZE}}
+          livenessProbe:
+            tcpSocket: {port: 50051}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket: {port: 50051}
+            initialDelaySeconds: 3
+            periodSeconds: 5
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  namespace: tinywebserver
+  labels:
+    app: user-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      containers:
+        - name: user-service
+          image: tinywebserver:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/app/user_grpc_server"]
+          args: ["0.0.0.0:50053"]
+          ports:
+            - containerPort: 50053
+              name: grpc
+          env:
+            - name: USER_DB_HOST
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: MYSQL_HOST}}
+            - name: USER_DB_PORT
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: MYSQL_PORT}}
+            - name: USER_DB_NAME
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: MYSQL_DATABASE}}
+            - name: USER_DB_USER
+              valueFrom: {secretKeyRef: {name: mysql-secret, key: MYSQL_USER}}
+            - name: USER_DB_PASSWORD
+              valueFrom: {secretKeyRef: {name: mysql-secret, key: MYSQL_PASSWORD}}
+            - name: USER_DB_POOL_SIZE
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: SQL_POOL_SIZE}}
+          livenessProbe:
+            tcpSocket: {port: 50053}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket: {port: 50053}
+            initialDelaySeconds: 3
+            periodSeconds: 5
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: book-service
+  namespace: tinywebserver
+  labels:
+    app: book-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: book-service
+  template:
+    metadata:
+      labels:
+        app: book-service
+    spec:
+      containers:
+        - name: book-service
+          image: tinywebserver:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/app/book_grpc_server"]
+          args: ["0.0.0.0:50054"]
+          ports:
+            - containerPort: 50054
+              name: grpc
+          env:
+            - name: BOOK_DB_HOST
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: MYSQL_HOST}}
+            - name: BOOK_DB_PORT
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: MYSQL_PORT}}
+            - name: BOOK_DB_NAME
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: MYSQL_DATABASE}}
+            - name: BOOK_DB_USER
+              valueFrom: {secretKeyRef: {name: mysql-secret, key: MYSQL_USER}}
+            - name: BOOK_DB_PASSWORD
+              valueFrom: {secretKeyRef: {name: mysql-secret, key: MYSQL_PASSWORD}}
+            - name: BOOK_DB_POOL_SIZE
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: SQL_POOL_SIZE}}
+          livenessProbe:
+            tcpSocket: {port: 50054}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket: {port: 50054}
+            initialDelaySeconds: 3
+            periodSeconds: 5
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+  namespace: tinywebserver
+  labels:
+    app: order-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+    spec:
+      containers:
+        - name: order-service
+          image: tinywebserver:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/app/order_grpc_server"]
+          args: ["0.0.0.0:50052"]
+          ports:
+            - containerPort: 50052
+              name: grpc
+          env:
+            - name: ORDER_DB_HOST
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: MYSQL_HOST}}
+            - name: ORDER_DB_PORT
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: MYSQL_PORT}}
+            - name: ORDER_DB_NAME
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: MYSQL_DATABASE}}
+            - name: ORDER_DB_USER
+              valueFrom: {secretKeyRef: {name: mysql-secret, key: MYSQL_USER}}
+            - name: ORDER_DB_PASSWORD
+              valueFrom: {secretKeyRef: {name: mysql-secret, key: MYSQL_PASSWORD}}
+            - name: ORDER_DB_POOL_SIZE
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: SQL_POOL_SIZE}}
+            - name: INVENTORY_GRPC_TARGET
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: INVENTORY_GRPC_TARGET}}
+            - name: BOOK_GRPC_TARGET
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: BOOK_GRPC_TARGET}}
+          livenessProbe:
+            tcpSocket: {port: 50052}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket: {port: 50052}
+            initialDelaySeconds: 3
+            periodSeconds: 5
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
   name: tinywebserver
   namespace: tinywebserver
   labels:
     app: tinywebserver
 spec:
-  replicas: 2                    # 多副本水平扩展
+  replicas: 2
   selector:
     matchLabels:
       app: tinywebserver
@@ -17,7 +255,7 @@ spec:
     spec:
       containers:
         - name: server
-          image: tinywebserver:latest   # 替换为实际 registry 地址
+          image: tinywebserver:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9006
@@ -35,25 +273,33 @@ spec:
             - "$(SQL_POOL_SIZE)"
           env:
             - name: LOG_MODE
-              valueFrom:
-                configMapKeyRef:
-                  name: tinywebserver-config
-                  key: LOG_MODE
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: LOG_MODE}}
             - name: TRIG_MODE
-              valueFrom:
-                configMapKeyRef:
-                  name: tinywebserver-config
-                  key: TRIG_MODE
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: TRIG_MODE}}
             - name: THREAD_NUM
-              valueFrom:
-                configMapKeyRef:
-                  name: tinywebserver-config
-                  key: THREAD_NUM
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: THREAD_NUM}}
             - name: SQL_POOL_SIZE
-              valueFrom:
-                configMapKeyRef:
-                  name: tinywebserver-config
-                  key: SQL_POOL_SIZE
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: SQL_POOL_SIZE}}
+            - name: MYSQL_HOST
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: MYSQL_HOST}}
+            - name: MYSQL_PORT
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: MYSQL_PORT}}
+            - name: MYSQL_DATABASE
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: MYSQL_DATABASE}}
+            - name: MYSQL_USER
+              valueFrom: {secretKeyRef: {name: mysql-secret, key: MYSQL_USER}}
+            - name: MYSQL_PASSWORD
+              valueFrom: {secretKeyRef: {name: mysql-secret, key: MYSQL_PASSWORD}}
+            - name: REDIS_URL
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: REDIS_URL}}
+            - name: USER_GRPC_TARGET
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: USER_GRPC_TARGET}}
+            - name: BOOK_GRPC_TARGET
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: BOOK_GRPC_TARGET}}
+            - name: INVENTORY_GRPC_TARGET
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: INVENTORY_GRPC_TARGET}}
+            - name: ORDER_GRPC_TARGET
+              valueFrom: {configMapKeyRef: {name: tinywebserver-config, key: ORDER_GRPC_TARGET}}
           resources:
             requests:
               cpu: "250m"
@@ -62,12 +308,14 @@ spec:
               cpu: "1"
               memory: "512Mi"
           livenessProbe:
-            tcpSocket:
+            httpGet:
+              path: /api/live
               port: 9006
             initialDelaySeconds: 5
             periodSeconds: 10
           readinessProbe:
-            tcpSocket:
+            httpGet:
+              path: /api/ready
               port: 9006
-            initialDelaySeconds: 3
+            initialDelaySeconds: 10
             periodSeconds: 5

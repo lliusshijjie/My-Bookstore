@@ -63,6 +63,22 @@ int main()
     assert(health_response->status_code == 200);
     assert(health_response->body.find("\"web-gateway\"") != std::string::npos);
 
+    HttpRequest live;
+    live.method = HttpMethod::Get;
+    live.path = "/api/live";
+    auto live_response = gateway.dispatch(live);
+    assert(live_response.has_value());
+    assert(live_response->status_code == 200);
+    assert(live_response->body.find("\"status\":\"alive\"") != std::string::npos);
+
+    HttpRequest ready;
+    ready.method = HttpMethod::Get;
+    ready.path = "/api/ready";
+    auto ready_response = gateway.dispatch(ready);
+    assert(ready_response.has_value());
+    assert(ready_response->status_code == 200);
+    assert(ready_response->body.find("\"status\":\"ready\"") != std::string::npos);
+
     auto raw = health_response->to_http_string(false);
     assert(raw.find("HTTP/1.1 200 OK\r\n") == 0);
     assert(raw.find("Content-Type: application/json\r\n") != std::string::npos);

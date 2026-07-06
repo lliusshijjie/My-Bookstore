@@ -67,6 +67,18 @@ RedisUserCache::RedisUserCache(const std::string& url, connection_pool* pool)
 
 RedisUserCache::~RedisUserCache() = default;
 
+bool RedisUserCache::ping(const std::string& url, std::string* error)
+{
+    try {
+        sw::redis::Redis redis(url);
+        redis.ping();
+        return true;
+    } catch (const std::exception& e) {
+        if (error != nullptr) *error = e.what();
+        return false;
+    }
+}
+
 void RedisUserCache::load(connection_pool* pool)
 {
     if (impl_->pool == nullptr) impl_->pool = pool;

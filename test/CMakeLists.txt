@@ -147,3 +147,25 @@ target_link_recommend_index(test_recommend_index)
 target_include_directories(test_recommend_index PRIVATE ${TEST_INCLUDE_DIR})
 target_compile_features(test_recommend_index PRIVATE cxx_std_17)
 add_test(NAME recommend_index COMMAND test_recommend_index)
+
+if(TINYWEBSERVER_REDIS_AVAILABLE)
+    add_executable(test_redis_user_cache
+        test_redis_user_cache.cpp
+        ${CMAKE_SOURCE_DIR}/src/db/redis_user_cache.cpp
+        ${CMAKE_SOURCE_DIR}/src/db/user_cache.cpp
+        ${CMAKE_SOURCE_DIR}/src/db/sql_connection_pool.cpp
+        ${CMAKE_SOURCE_DIR}/src/log/log.cpp
+    )
+    target_include_directories(test_redis_user_cache PRIVATE
+        ${TEST_INCLUDE_DIR}
+        ${HIREDIS_INCLUDE_DIR}
+        ${REDISPP_INCLUDE_DIR})
+    target_compile_features(test_redis_user_cache PRIVATE cxx_std_17)
+    target_link_libraries(test_redis_user_cache PRIVATE
+        ${REDISPP_LIBRARY}
+        ${HIREDIS_LIBRARY}
+        mysqlclient
+        Threads::Threads)
+    add_test(NAME redis_user_cache COMMAND test_redis_user_cache)
+    set_tests_properties(redis_user_cache PROPERTIES SKIP_RETURN_CODE 77)
+endif()

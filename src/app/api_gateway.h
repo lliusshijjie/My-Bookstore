@@ -23,12 +23,15 @@
 #include "src/app/service/order_service.h"
 #include "src/app/service/recommend_service.h"
 #include "src/app/service/user_service.h"
+#include "src/app/util/json.h"
 #include "src/net/http/http_request.h"
 #include "src/net/http/http_response.h"
 #include "src/net/http/router.h"
 
+#include <functional>
 #include <memory>
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -49,6 +52,13 @@ public:
         std::shared_ptr<UserClient> user_client;
         std::shared_ptr<BookClient> book_client;
     };
+
+    struct ReadinessStatus {
+        bool ready{true};
+        std::string detail{"ok"};
+    };
+
+    using ReadinessChecker = std::function<ReadinessStatus()>;
 
     explicit ApiGateway(Dependencies dependencies)
         : dependencies_(std::move(dependencies)),
@@ -90,6 +100,11 @@ public:
     std::optional<HttpResponse> dispatch(const HttpRequest& request) const
     {
         return router_.route(request);
+    }
+
+    void set_readiness_checker(ReadinessChecker checker)
+    {
+        readiness_checker_ = std::move(checker);
     }
 
     static Dependencies default_dependencies()
@@ -170,6 +185,27 @@ private:
                     200,
                     "{\"code\":0,\"message\":\"ok\",\"data\":{\"service\":\"web-gateway\"}}");
             });
+        router_.add_route(HttpMethod::Get, "/api/live",
+            [](const HttpRequest&) {
+                return HttpResponse::json(
+                    200,
+                    "{\"code\":0,\"message\":\"ok\",\"data\":{\"status\":\"alive\"}}");
+            });
+        router_.add_route(HttpMethod::Get, "/api/ready",
+            [this](const HttpRequest&) {
+                ReadinessStatus status;
+                if (readiness_checker_) {
+                    status = readiness_checker_();
+                }
+                const int http_status = status.ready ? 200 : 503;
+                const std::string state = status.ready ? "ready" : "not_ready";
+                return HttpResponse::json(
+                    http_status,
+                    "{\"code\":" + std::to_string(status.ready ? 0 : 503) +
+                    ",\"message\":\"" + (status.ready ? std::string("ok") : std::string("unavailable")) +
+                    "\",\"data\":{\"status\":\"" + state +
+                    "\",\"detail\":\"" + escape_json_string(status.detail) + "\"}}");
+            });
         router_.add_route(HttpMethod::Get, "/api/books",
             [this](const HttpRequest& request) {
                 return handle_list_books(request, *dependencies_.book_client);
@@ -236,4 +272,5 @@ private:
     OrderService order_service_;
     RecommendService recommend_service_;
     Router router_;
+    ReadinessChecker readiness_checker_;
 };

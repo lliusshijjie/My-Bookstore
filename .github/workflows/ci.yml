@@ -59,3 +59,57 @@ jobs:
 
       - name: Validate Makefile server build
         run: make server
+
+  redis-enabled-build:
+    name: Redis-enabled build and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install base dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            g++ \
+            git \
+            libgrpc++-dev \
+            libhiredis-dev \
+            libmysqlclient-dev \
+            libprotobuf-dev \
+            pkg-config \
+            protobuf-compiler \
+            protobuf-compiler-grpc \
+            redis-server
+
+      - name: Build and install redis-plus-plus
+        run: |
+          git clone --depth 1 https://github.com/sewenew/redis-plus-plus.git /tmp/redis-plus-plus
+          cmake -S /tmp/redis-plus-plus -B /tmp/redis-plus-plus-build \
+            -DREDIS_PLUS_PLUS_BUILD_TEST=OFF \
+            -DREDIS_PLUS_PLUS_BUILD_STATIC=OFF \
+            -DREDIS_PLUS_PLUS_CXX_STANDARD=17 \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/redis-plus-plus-build --parallel
+          sudo cmake --install /tmp/redis-plus-plus-build
+          sudo ldconfig
+
+      - name: Start Redis
+        run: |
+          redis-server --daemonize yes
+          redis-cli ping
+
+      - name: Configure CMake with Redis
+        run: cmake -S . -B ci-build-redis -DBUILD_TESTS=ON -DTINYWEBSERVER_ENABLE_REDIS=ON
+
+      - name: Build with Redis
+        run: cmake --build ci-build-redis --parallel
+
+      - name: Run Redis-enabled tests
+        env:
+          CTEST_OUTPUT_ON_FAILURE: "1"
+          TEST_REDIS_URL: tcp://127.0.0.1:6379
+        working-directory: ci-build-redis
+        run: ctest --output-on-failure

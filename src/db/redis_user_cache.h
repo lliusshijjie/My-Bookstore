@@ -15,6 +15,8 @@ public:
     explicit RedisUserCache(const std::string& url, connection_pool* pool);
     ~RedisUserCache() override;
 
+    static bool ping(const std::string& url, std::string* error = nullptr);
+
     void load(connection_pool* pool) override;
     bool authenticate(std::string_view user, std::string_view pass) const override;
     bool register_user(std::string_view user, std::string_view pass, MYSQL* db) override;

@@ -1,7 +1,9 @@
 #include <chrono>
 #include <cstdlib>
+#include <sstream>
 #include <thread>
 #include <utility>
+#include <vector>
 #include "src/core/webserver.h"
 #include "src/core/static_root.h"
 
@@ -35,6 +37,28 @@ int env_int_or_default(const char* name, int fallback)
     long parsed = std::strtol(value, &end, 10);
     if (end == value || *end != '\0') return fallback;
     return static_cast<int>(parsed);
+}
+
+bool mysql_ping(connection_pool* pool, std::string& detail)
+{
+    if (pool == nullptr) {
+        detail = "mysql pool is not initialized";
+        return false;
+    }
+
+    MYSQL* mysql = nullptr;
+    connectionRAII conn(&mysql, pool);
+    if (mysql == nullptr) {
+        detail = "mysql connection is unavailable";
+        return false;
+    }
+
+    if (mysql_query(mysql, "SELECT 1") != 0) {
+        detail = std::string("mysql ping failed: ") + mysql_error(mysql);
+        return false;
+    }
+
+    return true;
 }
 
 }  // namespace
@@ -182,6 +206,33 @@ void WebServer::sql_pool()
     }
 #endif
     api_gateway.use_dependencies(std::move(dependencies));
+
+    const std::string redis_url = env_or_default("REDIS_URL", "");
+    api_gateway.set_readiness_checker([pool = m_connPool, redis_url]() {
+        std::vector<std::string> failures;
+        std::string detail;
+        if (!mysql_ping(pool, detail)) {
+            failures.push_back(detail);
+        }
+#ifdef TINYWEBSERVER_ENABLE_REDIS
+        if (!redis_url.empty()) {
+            std::string redis_error;
+            if (!RedisUserCache::ping(redis_url, &redis_error)) {
+                failures.push_back("redis ping failed: " + redis_error);
+            }
+        }
+#endif
+        if (failures.empty()) {
+            return ApiGateway::ReadinessStatus{true, "dependencies ready"};
+        }
+
+        std::ostringstream joined;
+        for (std::size_t i = 0; i < failures.size(); ++i) {
+            if (i != 0) joined << "; ";
+            joined << failures[i];
+        }
+        return ApiGateway::ReadinessStatus{false, joined.str()};
+    });
 }
 
 void WebServer::thread_pool()

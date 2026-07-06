@@ -4,14 +4,21 @@ metadata:
   name: tinywebserver-config
   namespace: tinywebserver
 data:
-  # 服务器启动参数（与 docker CMD 保持一致）
+  # Gateway startup args, aligned with deploy/docker/docker-compose.yml
   SERVER_PORT: "9006"
-  LOG_MODE: "1"        # 0=同步 1=异步
-  TRIG_MODE: "3"       # 3=ET+ET
+  LOG_MODE: "1"
+  TRIG_MODE: "3"
   THREAD_NUM: "8"
   SQL_POOL_SIZE: "8"
 
-  # MySQL 连接信息（非敏感部分）
+  # Shared data-service configuration
   MYSQL_HOST: "mysql-service"
   MYSQL_PORT: "3306"
   MYSQL_DATABASE: "qgydb"
+  REDIS_URL: "tcp://redis-service:6379"
+
+  # Split-service targets used by the gateway and order service.
+  USER_GRPC_TARGET: "user-service:50053"
+  BOOK_GRPC_TARGET: "book-service:50054"
+  INVENTORY_GRPC_TARGET: "inventory-service:50051"
+  ORDER_GRPC_TARGET: "order-service:50052"

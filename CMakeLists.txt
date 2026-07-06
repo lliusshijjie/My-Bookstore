@@ -61,6 +61,32 @@ target_include_directories(server
 )
 
 # ============================================================
+#  redis++ — 可选 Redis 用户凭据缓存
+# ============================================================
+option(TINYWEBSERVER_ENABLE_REDIS "Enable Redis-backed user cache" OFF)
+set(TINYWEBSERVER_REDIS_AVAILABLE OFF)
+
+if(TINYWEBSERVER_ENABLE_REDIS)
+    # hiredis（C 客户端库）
+    find_path(HIREDIS_INCLUDE_DIR NAMES hiredis/hiredis.h)
+    find_library(HIREDIS_LIBRARY NAMES hiredis)
+    # redis-plus-plus（C++ 封装，可由源码安装到 /usr/local 或 apt dev 包提供）
+    find_path(REDISPP_INCLUDE_DIR NAMES sw/redis++/redis++.h)
+    find_library(REDISPP_LIBRARY NAMES redis++)
+
+    if(HIREDIS_INCLUDE_DIR AND HIREDIS_LIBRARY AND REDISPP_INCLUDE_DIR AND REDISPP_LIBRARY)
+        set(TINYWEBSERVER_REDIS_AVAILABLE ON)
+        message(STATUS "Redis user cache enabled: hiredis=${HIREDIS_LIBRARY}, redis++=${REDISPP_LIBRARY}")
+    else()
+        message(FATAL_ERROR "TINYWEBSERVER_ENABLE_REDIS=ON but hiredis/redis++ not found.\n"
+                            "Install hiredis-dev (apt: libhiredis-dev) and redis-plus-plus "
+                            "(build & install from source, or apt: libredis-plus-plus-dev).")
+    endif()
+else()
+    message(STATUS "Redis user cache disabled (-DTINYWEBSERVER_ENABLE_REDIS=ON to enable)")
+endif()
+
+# ============================================================
 #  单元测试（可选，cmake .. -DBUILD_TESTS=ON 启用）
 # ============================================================
 option(BUILD_TESTS "Build unit tests" OFF)
@@ -345,32 +371,11 @@ endif()
 find_package(Threads REQUIRED)
 target_link_libraries(server PRIVATE Threads::Threads)
 
-# ============================================================
-#  redis++ — 可选 Redis 用户凭据缓存
-# ============================================================
-option(TINYWEBSERVER_ENABLE_REDIS "Enable Redis-backed user cache" OFF)
-
-if(TINYWEBSERVER_ENABLE_REDIS)
-    # hiredis（C 客户端库）
-    find_path(HIREDIS_INCLUDE_DIR NAMES hiredis/hiredis.h)
-    find_library(HIREDIS_LIBRARY NAMES hiredis)
-    # redis-plus-plus（C++ 封装，可由源码安装到 /usr/local 或 apt dev 包提供）
-    find_path(REDISPP_INCLUDE_DIR NAMES sw/redis++/redis++.h)
-    find_library(REDISPP_LIBRARY NAMES redis++)
-
-    if(HIREDIS_INCLUDE_DIR AND HIREDIS_LIBRARY AND REDISPP_INCLUDE_DIR AND REDISPP_LIBRARY)
-        target_sources(server PRIVATE src/db/redis_user_cache.cpp)
-        target_include_directories(server PRIVATE ${HIREDIS_INCLUDE_DIR} ${REDISPP_INCLUDE_DIR})
-        target_link_libraries(server PRIVATE ${REDISPP_LIBRARY} ${HIREDIS_LIBRARY})
-        target_compile_definitions(server PRIVATE TINYWEBSERVER_ENABLE_REDIS)
-        message(STATUS "Redis user cache enabled: hiredis=${HIREDIS_LIBRARY}, redis++=${REDISPP_LIBRARY}")
-    else()
-        message(FATAL_ERROR "TINYWEBSERVER_ENABLE_REDIS=ON but hiredis/redis++ not found.\n"
-                            "Install hiredis-dev (apt: libhiredis-dev) and redis-plus-plus "
-                            "(build & install from source, or apt: libredis-plus-plus-dev).")
-    endif()
-else()
-    message(STATUS "Redis user cache disabled (-DTINYWEBSERVER_ENABLE_REDIS=ON to enable)")
+if(TINYWEBSERVER_REDIS_AVAILABLE)
+    target_sources(server PRIVATE src/db/redis_user_cache.cpp)
+    target_include_directories(server PRIVATE ${HIREDIS_INCLUDE_DIR} ${REDISPP_INCLUDE_DIR})
+    target_link_libraries(server PRIVATE ${REDISPP_LIBRARY} ${HIREDIS_LIBRARY})
+    target_compile_definitions(server PRIVATE TINYWEBSERVER_ENABLE_REDIS)
 endif()
 
 # mysqlclient  — 数据库连接
