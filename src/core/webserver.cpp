@@ -12,6 +12,11 @@
 #include "src/app/client/grpc_user_client.h"
 #endif
 
+#ifdef TINYWEBSERVER_ENABLE_REDIS
+#include "src/db/redis_user_cache.h"
+#endif
+#include "src/db/user_cache.h"
+
 namespace {
 
 std::string env_or_default(const char* name, const std::string& fallback)
@@ -140,7 +145,22 @@ void WebServer::sql_pool()
         m_close_log);
 
     //初始化数据库读取表
-    HttpConn::load_user_cache(m_connPool);
+    {
+        std::unique_ptr<IUserCache> cache;
+#ifdef TINYWEBSERVER_ENABLE_REDIS
+        const char* redis_url = std::getenv("REDIS_URL");
+        if (redis_url != nullptr && redis_url[0] != '\0') {
+            cache = std::make_unique<RedisUserCache>(redis_url, m_connPool);
+            LOG_INFO("user cache: redis (%s)", redis_url);
+        }
+#endif
+        if (!cache) {
+            cache = std::make_unique<UserCache>();
+            LOG_INFO("user cache: in-memory");
+        }
+        HttpConn::set_user_cache(std::move(cache));
+        HttpConn::load_user_cache(m_connPool);
+    }
 
     auto dependencies = ApiGateway::mysql_dependencies(m_connPool);
 #ifdef TINYWEBSERVER_ENABLE_GRPC

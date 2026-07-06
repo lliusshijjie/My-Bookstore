@@ -98,18 +98,19 @@ CREATE TABLE IF NOT EXISTS order_items (
         ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Development seed accounts. Remove or replace in production.
+-- Development seed accounts. Passwords stored as SHA-256 hex (SHA2(pass, 256)).
+-- Plaintext for local dev: admin123 / test123 / alice123 / ...
 INSERT IGNORE INTO user (id, username, passwd) VALUES
-    (1,  'admin',   'admin123'),
-    (2,  'test',    'test123'),
-    (3,  'alice',   'alice123'),
-    (4,  'bob',     'bob123'),
-    (5,  'charlie', 'charlie123'),
-    (6,  'diana',   'diana123'),
-    (7,  'eve',     'eve123'),
-    (8,  'frank',   'frank123'),
-    (9,  'grace',   'grace123'),
-    (10, 'henry',   'henry123');
+    (1,  'admin',   SHA2('admin123',   256)),
+    (2,  'test',    SHA2('test123',    256)),
+    (3,  'alice',   SHA2('alice123',   256)),
+    (4,  'bob',     SHA2('bob123',     256)),
+    (5,  'charlie', SHA2('charlie123', 256)),
+    (6,  'diana',   SHA2('diana123',   256)),
+    (7,  'eve',     SHA2('eve123',     256)),
+    (8,  'frank',   SHA2('frank123',   256)),
+    (9,  'grace',   SHA2('grace123',   256)),
+    (10, 'henry',   SHA2('henry123',   256));
 
 INSERT INTO books (id, title, author, price_cents, stock, status) VALUES
     (1,  'C++ Primer',                          'Stanley Lippman',           9800,  12, 'active'),

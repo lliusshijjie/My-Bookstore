@@ -8,10 +8,12 @@
 FROM ubuntu:22.04 AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        g++ cmake make \
+        g++ cmake make git \
         libmysqlclient-dev \
         libgrpc++-dev \
         libprotobuf-dev \
+        libhiredis-dev \
+        libredis-plus-plus-dev \
         pkg-config \
         protobuf-compiler \
         protobuf-compiler-grpc \
@@ -23,6 +25,7 @@ COPY . .
 RUN cmake -B build \
           -DCMAKE_BUILD_TYPE=Release \
           -DBUILD_TESTS=OFF \
+          -DTINYWEBSERVER_ENABLE_REDIS=ON \
     && cmake --build build --parallel "$(nproc)"
 
 # ---- Runtime ----
@@ -32,6 +35,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libmysqlclient21 \
         libgrpc++1 \
         libprotobuf23 \
+        libhiredis0.14 \
+        libredis-plus-plus1.3 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

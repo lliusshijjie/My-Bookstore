@@ -21,6 +21,21 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: tinywebserver-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   inventory-service:
     image: tinywebserver-app:latest
     build:
@@ -53,6 +68,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
       inventory-service:
         condition: service_started
       user-service:
@@ -67,6 +84,7 @@ services:
       MYSQL_USER: ${MYSQL_USER:-tinyuser}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-tinypass}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-qgydb}
+      REDIS_URL: "tcp://redis:6379"
       INVENTORY_GRPC_TARGET: inventory-service:50051
       ORDER_GRPC_TARGET: order-service:50052
       USER_GRPC_TARGET: user-service:50053
@@ -159,3 +177,4 @@ services:
 
 volumes:
   mysql_data:
+  redis_data:

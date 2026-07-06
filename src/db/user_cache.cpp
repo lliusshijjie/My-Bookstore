@@ -14,7 +14,6 @@ void UserCache::load(connection_pool* pool) {
         return;
     }
 
-    // 结果集 RAII 自动释放
     auto result = std::unique_ptr<MYSQL_RES, decltype(&mysql_free_result)>(
         mysql_store_result(mysql), mysql_free_result);
 
@@ -38,14 +37,16 @@ void UserCache::load(connection_pool* pool) {
 
 bool UserCache::authenticate(std::string_view user,
                              std::string_view pass) const {
+    std::string hashed = sha256_hex(std::string(pass));
     std::shared_lock lock(mutex_);
     auto it = users_.find(std::string(user));
-    return it != users_.end() && it->second == pass;
+    return it != users_.end() && it->second == hashed;
 }
 
 bool UserCache::register_user(std::string_view user, std::string_view pass,
                               MYSQL* db) {
-    // 先在读锁下检查是否已存在，避免不必要的写操作
+    std::string hashed = sha256_hex(std::string(pass));
+
     {
         std::shared_lock rlock(mutex_);
         if (users_.count(std::string(user))) {
@@ -53,15 +54,13 @@ bool UserCache::register_user(std::string_view user, std::string_view pass,
         }
     }
 
-    // 对用户名和密码进行转义，防止 SQL 注入
-    // mysql_real_escape_string 最多需要 2*len+1 字节的缓冲区
     std::string escaped_user(user.size() * 2 + 1, '\0');
-    std::string escaped_pass(pass.size() * 2 + 1, '\0');
+    std::string escaped_pass(hashed.size() * 2 + 1, '\0');
 
     unsigned long eu_len = mysql_real_escape_string(
         db, escaped_user.data(), user.data(), user.size());
     unsigned long ep_len = mysql_real_escape_string(
-        db, escaped_pass.data(), pass.data(), pass.size());
+        db, escaped_pass.data(), hashed.data(), hashed.size());
 
     escaped_user.resize(eu_len);
     escaped_pass.resize(ep_len);
@@ -72,7 +71,6 @@ bool UserCache::register_user(std::string_view user, std::string_view pass,
 
     std::unique_lock wlock(mutex_);
 
-    // 在写锁下二次检查（双重检查锁定模式）
     if (users_.count(std::string(user))) {
         return false;
     }
@@ -82,6 +80,6 @@ bool UserCache::register_user(std::string_view user, std::string_view pass,
         return false;
     }
 
-    users_.emplace(std::string(user), std::string(pass));
+    users_.emplace(std::string(user), hashed);
     return true;
 }
