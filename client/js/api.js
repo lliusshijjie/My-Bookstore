@@ -32,6 +32,9 @@ var Api = (function () {
     searchBooks: function (query) {
       return request('GET', '/api/books/search?q=' + encodeURIComponent(query));
     },
+    similarBooks: function (bookId) {
+      return request('GET', '/api/books/' + encodeURIComponent(bookId) + '/similar');
+    },
     inventory: function (bookId) {
       return request('GET', '/api/inventory/books/' + bookId);
     },

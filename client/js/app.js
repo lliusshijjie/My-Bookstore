@@ -223,6 +223,60 @@
     showToast('已加入购物袋');
   }
 
+  function createBookCard(book, index) {
+    var card = document.createElement('article');
+    card.className = 'book-card';
+    card.setAttribute('role', 'listitem');
+    card.style.animationDelay = (index * 0.06) + 's';
+
+    var spine = document.createElement('div');
+    spine.className = 'book-spine';
+    spine.style.background = getSpineColor(book.id);
+
+    var body = document.createElement('div');
+    body.className = 'book-body';
+
+    var title = document.createElement('h3');
+    title.className = 'book-title';
+    title.textContent = book.title;
+
+    var author = document.createElement('p');
+    author.className = 'book-author';
+    author.textContent = book.author;
+
+    var meta = document.createElement('div');
+    meta.className = 'book-meta';
+
+    var price = document.createElement('span');
+    price.className = 'book-price';
+    price.textContent = formatPrice(book.price_cents);
+
+    var stock = document.createElement('span');
+    stock.className = 'book-stock' + (book.stock <= 3 ? ' low' : '');
+    stock.textContent = '库存 ' + book.stock;
+
+    meta.appendChild(price);
+    meta.appendChild(stock);
+
+    var addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'btn btn-primary btn-add';
+    addBtn.textContent = '加入购物袋';
+    addBtn.disabled = book.stock <= 0 || book.status !== 'active';
+    addBtn.addEventListener('click', function () {
+      addToCart(book);
+    });
+
+    body.appendChild(title);
+    body.appendChild(author);
+    body.appendChild(meta);
+    body.appendChild(addBtn);
+
+    card.appendChild(spine);
+    card.appendChild(body);
+    return card;
+  }
+
   function renderBooks(books) {
     var list = books || state.books;
     els.bookGrid.innerHTML = '';
@@ -230,57 +284,36 @@
     setHidden(els.catalogError, true);
 
     list.forEach(function (book, index) {
-      var card = document.createElement('article');
-      card.className = 'book-card';
-      card.setAttribute('role', 'listitem');
-      card.style.animationDelay = (index * 0.06) + 's';
+      els.bookGrid.appendChild(createBookCard(book, index));
+    });
+  }
 
-      var spine = document.createElement('div');
-      spine.className = 'book-spine';
-      spine.style.background = getSpineColor(book.id);
+  function renderRecommendations(books) {
+    els.recommendGrid.innerHTML = '';
+    setHidden(els.recommendError, true);
+    setHidden(els.recommendEmpty, books.length > 0);
+    books.forEach(function (book, index) {
+      els.recommendGrid.appendChild(createBookCard(book, index));
+    });
+  }
 
-      var body = document.createElement('div');
-      body.className = 'book-body';
-
-      var title = document.createElement('h3');
-      title.className = 'book-title';
-      title.textContent = book.title;
-
-      var author = document.createElement('p');
-      author.className = 'book-author';
-      author.textContent = book.author;
-
-      var meta = document.createElement('div');
-      meta.className = 'book-meta';
-
-      var price = document.createElement('span');
-      price.className = 'book-price';
-      price.textContent = formatPrice(book.price_cents);
-
-      var stock = document.createElement('span');
-      stock.className = 'book-stock' + (book.stock <= 3 ? ' low' : '');
-      stock.textContent = '库存 ' + book.stock;
-
-      meta.appendChild(price);
-      meta.appendChild(stock);
-
-      var addBtn = document.createElement('button');
-      addBtn.type = 'button';
-      addBtn.className = 'btn btn-primary btn-add';
-      addBtn.textContent = '加入购物袋';
-      addBtn.disabled = book.stock <= 0 || book.status !== 'active';
-      addBtn.addEventListener('click', function () {
-        addToCart(book);
-      });
-
-      body.appendChild(title);
-      body.appendChild(author);
-      body.appendChild(meta);
-      body.appendChild(addBtn);
-
-      card.appendChild(spine);
-      card.appendChild(body);
-      els.bookGrid.appendChild(card);
+  function fetchRecommendations(seedBook) {
+    if (!seedBook) {
+      setHidden(els.recommendEmpty, false);
+      return;
+    }
+    Api.similarBooks(seedBook.id).then(function (res) {
+      if (res.ok && res.data && res.data.books) {
+        renderRecommendations(res.data.books);
+      } else {
+        setHidden(els.recommendEmpty, false);
+        els.recommendError.textContent = res.message || '加载推荐失败';
+        setHidden(els.recommendError, false);
+      }
+    }).catch(function () {
+      setHidden(els.recommendEmpty, false);
+      els.recommendError.textContent = '推荐请求失败';
+      setHidden(els.recommendError, false);
     });
   }
 
@@ -414,6 +447,8 @@
           renderBooks(state.books);
           setSearchStatus('', '');
         }
+        var seed = state.books[0];
+        fetchRecommendations(seed);
       } else {
         els.catalogError.textContent = res.message || '加载书目失败';
         setHidden(els.catalogError, false);
@@ -601,6 +636,9 @@
       bookGrid: $('book-grid'),
       catalogEmpty: $('catalog-empty'),
       catalogError: $('catalog-error'),
+      recommendGrid: $('recommend-grid'),
+      recommendEmpty: $('recommend-empty'),
+      recommendError: $('recommend-error'),
       cartCount: $('cart-count'),
       cartList: $('cart-list'),
       cartEmpty: $('cart-empty'),

@@ -27,12 +27,16 @@ void connection_pool::init(std::string url, std::string User, std::string PassWo
             LOG_ERROR("MySQL Error: mysql_init failed");
             exit(1);
         }
+        // 强制连接使用 utf8mb4，否则 mysql 客户端默认 latin1 会把库里的 UTF-8 中文
+        // 转成乱码字节，导致前端列表与搜索都无法匹配中文
+        mysql_options(con, MYSQL_SET_CHARSET_NAME, "utf8mb4");
         con = mysql_real_connect(con, url.c_str(), User.c_str(),
                                  PassWord.c_str(), DBName.c_str(), Port, nullptr, 0);
         if (con == nullptr) {
             LOG_ERROR("MySQL Error: mysql_real_connect failed");
             exit(1);
         }
+        mysql_query(con, "SET NAMES utf8mb4");
         connList.push_back(con);
         ++m_FreeConn;
     }

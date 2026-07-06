@@ -36,6 +36,33 @@ inline std::optional<std::string> get_param(std::string_view body,
     return std::nullopt;
 }
 
+// 百分号解码（RFC 3986）；不处理 '+' -> ' '，因为前端用 encodeURIComponent 编码空格为 %20
+inline std::string url_decode(std::string_view s)
+{
+    std::string out;
+    out.reserve(s.size());
+    auto hex_val = [](char c) -> int {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+        return -1;
+    };
+    for (std::size_t i = 0; i < s.size(); ++i) {
+        char c = s[i];
+        if (c == '%' && i + 2 < s.size()) {
+            int hi = hex_val(s[i + 1]);
+            int lo = hex_val(s[i + 2]);
+            if (hi >= 0 && lo >= 0) {
+                out.push_back(static_cast<char>((hi << 4) | lo));
+                i += 2;
+                continue;
+            }
+        }
+        out.push_back(c);
+    }
+    return out;
+}
+
 inline std::unordered_map<std::string, std::string> parse_query_string(std::string_view query)
 {
     std::unordered_map<std::string, std::string> params;
@@ -47,8 +74,8 @@ inline std::unordered_map<std::string, std::string> parse_query_string(std::stri
                                      : query.substr(pos, amp - pos);
         std::size_t eq = token.find('=');
         if (eq != std::string_view::npos) {
-            params.emplace(std::string(token.substr(0, eq)),
-                           std::string(token.substr(eq + 1)));
+            params.emplace(url_decode(token.substr(0, eq)),
+                           url_decode(token.substr(eq + 1)));
         }
         if (amp == std::string_view::npos) {
             break;
