@@ -16,7 +16,7 @@
 // ---- 静态成员定义 ----
 std::atomic<int> HttpConn::user_count{0};
 int              HttpConn::epoll_fd = -1;
-UserCache        HttpConn::user_cache;
+std::unique_ptr<IUserCache> HttpConn::user_cache;
 
 // ---- 模块内 epoll 辅助函数（替代原重复的自由函数） ----
 namespace {
@@ -103,7 +103,6 @@ void HttpConn::reset_state() {
     check_state_   = CheckState::RequestLine;
     method_        = Method::Get;
     linger_        = false;
-    is_cgi_        = false;
     content_length_ = 0;
     line_start_    = 0;
     checked_idx_   = 0;
@@ -241,7 +240,7 @@ HttpConn::HttpCode HttpConn::parse_request_line(std::string_view text) {
 
     std::string_view method_sv = text.substr(0, sp1);
     if (method_sv == "GET")       { method_ = Method::Get;  }
-    else if (method_sv == "POST") { method_ = Method::Post; is_cgi_ = true; }
+    else if (method_sv == "POST") { method_ = Method::Post; }
     else return HttpCode::BadRequest;
 
     // 提取 URL
@@ -313,39 +312,19 @@ HttpConn::HttpCode HttpConn::parse_headers(std::string_view text) {
     return HttpCode::NoRequest;
 }
 
-HttpConn::HttpCode HttpConn::parse_content(std::string_view text) {
-    if (read_idx_ >= static_cast<int>(checked_idx_) + content_length_) {
-        request_body_ = std::string(text.substr(0, content_length_));
-        return HttpCode::GetRequest;
+HttpConn::HttpCode HttpConn::parse_content(std::string_view /*text*/) {
+    if (content_length_ <= 0 ||
+        read_idx_ < static_cast<int>(checked_idx_) + content_length_) {
+        return HttpCode::NoRequest;
     }
-    return HttpCode::NoRequest;
+    request_body_ = std::string(read_buf_.data() + checked_idx_,
+                                static_cast<std::size_t>(content_length_));
+    return HttpCode::GetRequest;
 }
 
 // ============================================================
 //  请求分发
 // ============================================================
-
-// 辅助函数：构建 URL 路由查找表（GCC 9 C++17 兼容，不用 constexpr lambda）
-static std::array<HttpConn::UrlAction, 128> build_route_lut() {
-    std::array<HttpConn::UrlAction, 128> t{};
-    t.fill(HttpConn::UrlAction::StaticFile);
-    t['0'] = HttpConn::UrlAction::RegisterPage;
-    t['1'] = HttpConn::UrlAction::LoginPage;
-    t['2'] = HttpConn::UrlAction::LoginSubmit;
-    t['3'] = HttpConn::UrlAction::RegisterSubmit;
-    t['5'] = HttpConn::UrlAction::PicturePage;
-    t['6'] = HttpConn::UrlAction::VideoPage;
-    t['7'] = HttpConn::UrlAction::FansPage;
-    return t;
-}
-
-HttpConn::UrlAction HttpConn::classify_url(std::string_view seg) {
-    if (seg.empty()) return UrlAction::StaticFile;
-
-    static const auto lut = build_route_lut();
-    auto ch = static_cast<unsigned char>(seg[0]);
-    return (ch < 128) ? lut[ch] : UrlAction::StaticFile;
-}
 
 HttpConn::HttpCode HttpConn::do_request() {
     if (url_.rfind("/api/", 0) == 0) {
@@ -370,52 +349,8 @@ HttpConn::HttpCode HttpConn::do_request() {
         return HttpCode::ApiResponse;
     }
 
-    // 找到最后一个 '/' 后面的字符，确定路由动作
-    auto last_slash = url_.rfind('/');
-    std::string_view seg = (last_slash == std::string::npos)
-                               ? std::string_view(url_)
-                               : std::string_view(url_).substr(last_slash + 1);
-
-    UrlAction action = classify_url(seg);
-
-    // CGI 处理：POST 登录或注册
-    if (is_cgi_ &&
-        (action == UrlAction::LoginSubmit || action == UrlAction::RegisterSubmit)) {
-        auto opt_user = get_param(request_body_, "user");
-        auto opt_pass = get_param(request_body_, "passwd");
-
-        if (!opt_user || !opt_pass) {
-            url_   = "/logError.html";
-            action = UrlAction::StaticFile;
-        } else {
-            if (action == UrlAction::LoginSubmit) {
-                url_ = user_cache.authenticate(*opt_user, *opt_pass)
-                           ? "/welcome.html" : "/logError.html";
-            } else {
-                url_ = user_cache.register_user(*opt_user, *opt_pass, mysql)
-                           ? "/log.html" : "/registerError.html";
-            }
-            action = UrlAction::StaticFile;
-        }
-    }
-
-    // action → 静态文件路径映射表（data-driven，新增路由只需加一行）
-    struct ActionPath { UrlAction action; std::string_view path; };
-    static constexpr ActionPath kActionPaths[] = {
-        {UrlAction::RegisterPage, "/register.html"},
-        {UrlAction::LoginPage,    "/log.html"},
-        {UrlAction::PicturePage,  "/picture.html"},
-        {UrlAction::VideoPage,    "/video.html"},
-        {UrlAction::FansPage,     "/fans.html"},
-    };
-
-    real_file_ = doc_root_ + url_;  // 默认：StaticFile 直接拼 url_
-    for (const auto &ap : kActionPaths) {
-        if (action == ap.action) {
-            real_file_ = doc_root_ + std::string(ap.path);
-            break;
-        }
-    }
+    // 静态文件：直接拼接 doc_root_ + url_
+    real_file_ = doc_root_ + url_;
 
     if (stat(real_file_.c_str(), &file_stat_) < 0) return HttpCode::NoResource;
     if (!(file_stat_.st_mode & S_IROTH))            return HttpCode::ForbiddenRequest;

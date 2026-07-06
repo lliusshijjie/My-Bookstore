@@ -13,9 +13,9 @@
 #include <mysql/mysql.h>
 
 #include "src/db/sql_connection_pool.h"
+#include "src/db/user_cache.h"
 #include "src/log/log.h"
 #include "src/net/http/mmap_guard.h"
-#include "src/db/user_cache.h"
 
 class ApiGateway;
 
@@ -32,21 +32,11 @@ public:
         ForbiddenRequest, FileRequest, ApiResponse, InternalError, ClosedConnection
     };
     enum class LineStatus { Ok, Bad, Open };
-    enum class UrlAction  {
-        RegisterPage,   // '0' -> /register.html
-        LoginPage,      // '1' -> /log.html
-        LoginSubmit,    // '2' POST -> verify credentials
-        RegisterSubmit, // '3' POST -> create user
-        PicturePage,    // '5' -> /picture.html
-        VideoPage,      // '6' -> /video.html
-        FansPage,       // '7' -> /fans.html
-        StaticFile      // other -> serve file directly
-    };
 
     // 所有连接共享；由 WebServer 初始化一次
     static std::atomic<int> user_count;
     static int              epoll_fd;
-    static UserCache        user_cache;
+    static std::unique_ptr<IUserCache> user_cache;
 
     // 线程池和主事件循环共享的状态（Reactor 握手协议）
     std::atomic<bool> improv{false};
@@ -72,9 +62,12 @@ public:
 
     const sockaddr_in* get_address() const noexcept { return &address_; }
 
-    // 启动时一次性加载用户名/密码表到共享缓存
+    // 启动时注入共享用户缓存实例
+    static void set_user_cache(std::unique_ptr<IUserCache> cache) {
+        user_cache = std::move(cache);
+    }
     static void load_user_cache(connection_pool* pool) {
-        user_cache.load(pool);
+        if (user_cache) user_cache->load(pool);
     }
 
 private:
@@ -87,7 +80,6 @@ private:
     HttpCode   parse_content(std::string_view text);
     HttpCode   do_request();
 
-    static UrlAction classify_url(std::string_view last_char);
     std::string_view get_line() const noexcept;
 
     // HTTP 响应构建相关
@@ -131,7 +123,6 @@ private:
     // ------- HTTP 解析状态 -------
     CheckState  check_state_{CheckState::RequestLine};
     Method      method_{Method::Get};
-    bool        is_cgi_{false};
     bool        linger_{false};
     std::string url_;
     std::string version_;

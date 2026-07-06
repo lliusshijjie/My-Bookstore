@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>书脊 · 登录</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/pages.css">
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <div class="page">
+    <div class="spine-stack" aria-hidden="true">
+      <i></i><i></i><i></i><i></i><i></i><i></i>
+    </div>
+
+    <div class="page-body">
+      <header class="page-header">
+        <a class="brand" href="judge.html">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>
+            <span class="brand-name">书脊</span>
+          </span>
+        </a>
+        <nav class="nav-links">
+          <a href="register.html">注册</a>
+          <a href="index.html">浏览书目</a>
+        </nav>
+      </header>
+
+      <main class="page-main card-shell">
+        <section class="card">
+          <p class="card-eyebrow">卷 · 账户</p>
+          <h1 class="card-title">登录</h1>
+          <p class="card-lede">用你的账户名回到书架之间。</p>
+
+          <form action="/2" method="POST" autocomplete="on">
+            <label class="form-field">
+              <span>用户名</span>
+              <input type="text" name="user" required minlength="2" maxlength="32" autocomplete="username" autofocus>
+            </label>
+            <label class="form-field">
+              <span>密码</span>
+              <input type="password" name="passwd" required minlength="4" maxlength="64" autocomplete="current-password">
+            </label>
+            <button type="submit" class="btn btn-primary btn-block">登录</button>
+          </form>
+
+          <p class="card-footer">还没有账户？<a href="register.html">注册一个</a>。</p>
+        </section>
+      </main>
+
+      <footer class="page-footer">提交至 /2 · 传统表单 POST</footer>
+    </div>
+  </div>
+</body>
+</html>
