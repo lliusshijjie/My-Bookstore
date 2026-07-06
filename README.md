@@ -6,8 +6,10 @@ TinyWebServer is evolving into a C++17 bookstore backend. The project keeps the 
 
 ```mermaid
 flowchart LR
-    Client["client/\nBrowser UI"]
-    Gateway["Web Gateway\nHTTP JSON :9006"]
+    Browser["Browser\nHTTPS :443"]
+    Nginx["Nginx reverse proxy\nTLS :443 / redirect :80"]
+    Gateway["Web Gateway\nHTTP JSON :9006\ninternal Docker network"]
+    Client["client/\nStatic browser assets"]
     Search["Book Search\n/api/books/search"]
     Recommend["Recommend Index\n/api/books/{id}/similar"]
     UserSvc["User gRPC\n:50053"]
@@ -17,7 +19,9 @@ flowchart LR
     MySQL[("MySQL qgydb")]
     Redis[("Redis credential cache")]
 
-    Client -->|"HTTP /api/*"| Gateway
+    Browser -->|"HTTPS /"| Nginx
+    Nginx -->|"HTTP upstream\nserver:9006"| Gateway
+    Gateway -->|"serves static files"| Client
     Gateway --> Search
     Gateway --> Recommend
     Gateway --> UserSvc
