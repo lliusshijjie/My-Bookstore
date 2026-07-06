@@ -17,7 +17,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ============================================================
-#  编译选项（与原 Makefile 对齐）
+#  编译选项
 # ============================================================
 # DEBUG=1  → Debug   : -g -O0
 # DEBUG=0  → Release : -O2
@@ -84,6 +84,24 @@ if(TINYWEBSERVER_ENABLE_REDIS)
     endif()
 else()
     message(STATUS "Redis user cache disabled (-DTINYWEBSERVER_ENABLE_REDIS=ON to enable)")
+endif()
+
+# ============================================================
+#  hnswlib — 可选推荐索引后端
+# ============================================================
+option(TINYWEBSERVER_ENABLE_HNSW "Enable hnswlib-backed recommendation index" OFF)
+set(TINYWEBSERVER_HNSW_AVAILABLE OFF)
+
+if(TINYWEBSERVER_ENABLE_HNSW)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/hnswlib/CMakeLists.txt")
+        add_subdirectory(third_party/hnswlib EXCLUDE_FROM_ALL)
+        set(TINYWEBSERVER_HNSW_AVAILABLE ON)
+        message(STATUS "hnswlib recommendation index enabled")
+    else()
+        message(FATAL_ERROR "TINYWEBSERVER_ENABLE_HNSW=ON but third_party/hnswlib is missing")
+    endif()
+else()
+    message(STATUS "hnswlib recommendation index disabled (-DTINYWEBSERVER_ENABLE_HNSW=ON to enable)")
 endif()
 
 # ============================================================
@@ -376,6 +394,11 @@ if(TINYWEBSERVER_REDIS_AVAILABLE)
     target_include_directories(server PRIVATE ${HIREDIS_INCLUDE_DIR} ${REDISPP_INCLUDE_DIR})
     target_link_libraries(server PRIVATE ${REDISPP_LIBRARY} ${HIREDIS_LIBRARY})
     target_compile_definitions(server PRIVATE TINYWEBSERVER_ENABLE_REDIS)
+endif()
+
+if(TINYWEBSERVER_HNSW_AVAILABLE)
+    target_link_libraries(server PRIVATE hnswlib::hnswlib)
+    target_compile_definitions(server PRIVATE TINYWEBSERVER_ENABLE_HNSW)
 endif()
 
 # mysqlclient  — 数据库连接

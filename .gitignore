@@ -44,4 +44,4 @@ deploy/docker/nginx/certs/
 
 # AI Agent 相关
 CLAUDE.md
-Agent.md
+AGENTS.md

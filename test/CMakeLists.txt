@@ -9,6 +9,10 @@ find_package(Threads REQUIRED)
 
 function(target_link_recommend_index target_name)
     target_sources(${target_name} PRIVATE ${RECOMMEND_INDEX_SOURCE})
+    if(TINYWEBSERVER_HNSW_AVAILABLE)
+        target_link_libraries(${target_name} PRIVATE hnswlib::hnswlib)
+        target_compile_definitions(${target_name} PRIVATE TINYWEBSERVER_ENABLE_HNSW)
+    endif()
 endfunction()
 
 # --- test_url_params ---

@@ -45,6 +45,8 @@ int main()
     assert_contains(start_sh, "/api/live");
     assert_contains(start_sh, "/api/ready");
     assert_contains(start_sh, "TINYWEBSERVER_ENABLE_REDIS=ON");
+    assert_contains(start_sh, "ENABLE_HNSW=1");
+    assert_contains(start_sh, "TINYWEBSERVER_ENABLE_HNSW=ON");
 
     const auto quick_start = read_file({
         "../scripts/start_server.sh",
@@ -64,6 +66,17 @@ int main()
     assert(!build_sh.empty());
     assert_contains(build_sh, "ENABLE_REDIS=1");
     assert_contains(build_sh, "TINYWEBSERVER_ENABLE_REDIS");
+    assert_contains(build_sh, "ENABLE_HNSW=1");
+    assert_contains(build_sh, "TINYWEBSERVER_ENABLE_HNSW");
+
+    const auto dockerfile = read_file({
+        "../deploy/docker/Dockerfile",
+        "deploy/docker/Dockerfile",
+        "../../deploy/docker/Dockerfile",
+    });
+    assert(!dockerfile.empty());
+    assert_contains(dockerfile, "ARG ENABLE_HNSW=0");
+    assert_contains(dockerfile, "TINYWEBSERVER_ENABLE_HNSW=ON");
 
     const auto readme = read_file({"../README.md", "README.md", "../../README.md"});
     assert(!readme.empty());

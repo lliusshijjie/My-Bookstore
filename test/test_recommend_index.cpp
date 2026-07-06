@@ -16,6 +16,7 @@ int main()
     };
 
     BookVectorIndex index;
+    assert(index.backend_name() == "topk");
     index.build(books);
     assert(index.ready());
 
@@ -31,6 +32,29 @@ int main()
         }
     }
     assert(found_stevens_neighbor);
+
+    BookVectorIndex explicit_topk(RecommendationIndexBackend::TopK);
+    assert(explicit_topk.backend_name() == "topk");
+    explicit_topk.build(books);
+    auto topk_results = explicit_topk.search_similar(books[0], 3);
+    assert(!topk_results.empty());
+    for (int book_id : topk_results) {
+        assert(book_id != books[0].id);
+        assert(book_id != 5);
+    }
+
+#ifdef TINYWEBSERVER_ENABLE_HNSW
+    BookVectorIndex hnsw_index(RecommendationIndexBackend::Hnsw);
+    assert(hnsw_index.backend_name() == "hnswlib");
+    hnsw_index.build(books);
+    assert(hnsw_index.ready());
+    auto hnsw_results = hnsw_index.search_similar(books[2], 3);
+    assert(!hnsw_results.empty());
+    for (int book_id : hnsw_results) {
+        assert(book_id != books[2].id);
+        assert(book_id != 5);
+    }
+#endif
 
     std::cout << "test_recommend_index: all passed\n";
     return 0;

@@ -49,16 +49,12 @@ jobs:
           test -f client/js/app.js
           grep -R "/api/books/search" client/js client/index.html
 
-      - name: Validate Makefile gRPC stub generation
+      - name: Validate CMake gRPC stub generation
         run: |
-          make GRPC_OUT_DIR=/tmp/tinyweb-grpc-generated grpc-stubs
-          test -f /tmp/tinyweb-grpc-generated/proto/user/v1/user.grpc.pb.cc
-          test -f /tmp/tinyweb-grpc-generated/proto/book/v1/book.grpc.pb.cc
-          test -f /tmp/tinyweb-grpc-generated/proto/inventory/v1/inventory.grpc.pb.cc
-          test -f /tmp/tinyweb-grpc-generated/proto/order/v1/order.grpc.pb.cc
-
-      - name: Validate Makefile server build
-        run: make server
+          test -f ci-build/generated/proto/user/v1/user.grpc.pb.cc
+          test -f ci-build/generated/proto/book/v1/book.grpc.pb.cc
+          test -f ci-build/generated/proto/inventory/v1/inventory.grpc.pb.cc
+          test -f ci-build/generated/proto/order/v1/order.grpc.pb.cc
 
   redis-enabled-build:
     name: Redis-enabled build and test
@@ -112,4 +108,37 @@ jobs:
           CTEST_OUTPUT_ON_FAILURE: "1"
           TEST_REDIS_URL: tcp://127.0.0.1:6379
         working-directory: ci-build-redis
+        run: ctest --output-on-failure
+
+  hnsw-enabled-build:
+    name: HNSW-enabled build and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            g++ \
+            libgrpc++-dev \
+            libmysqlclient-dev \
+            libprotobuf-dev \
+            pkg-config \
+            protobuf-compiler \
+            protobuf-compiler-grpc
+
+      - name: Configure CMake with hnswlib
+        run: cmake -S . -B ci-build-hnsw -DBUILD_TESTS=ON -DTINYWEBSERVER_ENABLE_HNSW=ON
+
+      - name: Build with hnswlib
+        run: cmake --build ci-build-hnsw --parallel
+
+      - name: Run hnswlib-enabled tests
+        env:
+          CTEST_OUTPUT_ON_FAILURE: "1"
+        working-directory: ci-build-hnsw
         run: ctest --output-on-failure

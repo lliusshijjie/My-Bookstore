@@ -6,6 +6,7 @@
 
 # ---- Builder ----
 FROM ubuntu:22.04 AS builder
+ARG ENABLE_HNSW=0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         g++ cmake make git \
@@ -22,11 +23,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /build
 COPY . .
 
-RUN cmake -B build \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DBUILD_TESTS=OFF \
-          -DTINYWEBSERVER_ENABLE_REDIS=ON \
-    && cmake --build build --parallel "$(nproc)"
+RUN set -eux; \
+    cmake_args="-DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF -DTINYWEBSERVER_ENABLE_REDIS=ON"; \
+    if [ "${ENABLE_HNSW}" = "1" ]; then \
+        cmake_args="${cmake_args} -DTINYWEBSERVER_ENABLE_HNSW=ON"; \
+    fi; \
+    cmake -B build ${cmake_args}; \
+    cmake --build build --parallel "$(nproc)"
 
 # ---- Runtime ----
 FROM ubuntu:22.04 AS runtime

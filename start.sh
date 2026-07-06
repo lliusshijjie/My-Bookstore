@@ -1,6 +1,7 @@
 #!/bin/bash
 # 编译并启动所有服务：Redis + 4 个 gRPC 微服务 + HTTP 网关
 # 用法: ./start.sh [--no-build]
+# 可选: ENABLE_HNSW=1 ./start.sh
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -19,8 +20,13 @@ done
 if [ "$SKIP_BUILD" -eq 0 ]; then
     echo "[1/4] 编译全部目标 ..."
     cd "$ROOT" || exit 1
+    CMAKE_ARGS=(-DTINYWEBSERVER_ENABLE_REDIS=ON -DCMAKE_BUILD_TYPE=Release)
     echo "  配置 CMake (启用 Redis 缓存) ..."
-    cmake -B "$BUILD" -DTINYWEBSERVER_ENABLE_REDIS=ON -DCMAKE_BUILD_TYPE=Release || exit 1
+    if [ "${ENABLE_HNSW:-0}" = "1" ]; then
+        echo "  启用 hnswlib 推荐后端 ..."
+        CMAKE_ARGS+=(-DTINYWEBSERVER_ENABLE_HNSW=ON)
+    fi
+    cmake -B "$BUILD" "${CMAKE_ARGS[@]}" || exit 1
     cmake --build "$BUILD" -j"$(nproc)" || exit 1
     echo "  编译完成"
 else

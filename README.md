@@ -71,9 +71,10 @@ flowchart LR
 | `src/app/repository/` | Repository interfaces plus `memory/` test repositories and `mysql/` DAO implementations. |
 | `src/app/client/` | Local and gRPC client abstractions used between services. |
 | `src/app/grpc/` | gRPC service implementations and standalone service entrypoints. |
-| `src/app/recommend/` | Lightweight book vector index for similar-book recommendations. |
+| `src/app/recommend/` | Book vector index for similar-book recommendations. Defaults to the in-repo topK backend and can compile an hnswlib backend. |
 | `proto/` | Protobuf contracts for user, book, inventory, and order services. |
 | `scripts/init.sql` | MySQL schema and seed data. |
+| `third_party/hnswlib/` | Vendored hnswlib headers used only when `TINYWEBSERVER_ENABLE_HNSW=ON`. |
 | `test/` | CTest-driven C++ tests. |
 
 ## Build And Test
@@ -97,6 +98,16 @@ The GitHub Actions Redis job builds redis-plus-plus from source; local Ubuntu
 22.04 environments can also use `libhiredis-dev libredis-plus-plus-dev` when
 available.
 
+Similar-book recommendations use the hand-written topK backend by default,
+which keeps the small local dataset path simple. To compile the optional hnswlib
+backend:
+
+```bash
+cmake -S . -B build-hnsw -DBUILD_TESTS=ON -DTINYWEBSERVER_ENABLE_HNSW=ON
+cmake --build build-hnsw -j$(nproc)
+cd build-hnsw && ctest --output-on-failure
+```
+
 Build and run tests:
 
 ```bash
@@ -105,12 +116,14 @@ cmake --build build -j$(nproc)
 cd build && ctest --output-on-failure
 ```
 
-Validate generated RPC contracts and the Makefile path:
+Validate generated RPC contracts and gRPC server targets:
 
 ```bash
 cmake --build build --target check_proto_contracts
-make grpc-stubs
-make server
+cmake --build build --target user_grpc_server
+cmake --build build --target book_grpc_server
+cmake --build build --target inventory_grpc_server
+cmake --build build --target order_grpc_server
 ```
 
 ## Run Locally
@@ -169,7 +182,9 @@ POST /api/orders/{order_id}/cancel
 
 GitHub Actions runs on pushes and pull requests. The default job installs
 C++/MySQL/gRPC/Protobuf dependencies, configures CMake with tests, builds all
-targets, validates Protobuf contracts, runs CTest, checks gRPC stub generation,
-and verifies the Makefile server build. A second job starts Redis, enables
+targets, validates Protobuf contracts, runs CTest, and checks gRPC stub generation.
+A second job starts Redis, enables
 `TINYWEBSERVER_ENABLE_REDIS=ON`, builds the Redis credential-cache path, and
-runs the Redis-aware CTest suite.
+runs the Redis-aware CTest suite. A third job enables
+`TINYWEBSERVER_ENABLE_HNSW=ON` so the optional hnswlib recommendation backend
+also stays buildable.
