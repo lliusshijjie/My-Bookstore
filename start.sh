@@ -19,10 +19,8 @@ done
 if [ "$SKIP_BUILD" -eq 0 ]; then
     echo "[1/4] 编译全部目标 ..."
     cd "$ROOT" || exit 1
-    if [ ! -f "$BUILD/CMakeCache.txt" ]; then
-        echo "  首次配置 CMake (启用 Redis 缓存) ..."
-        cmake -B "$BUILD" -DTINYWEBSERVER_ENABLE_REDIS=ON -DCMAKE_BUILD_TYPE=Release || exit 1
-    fi
+    echo "  配置 CMake (启用 Redis 缓存) ..."
+    cmake -B "$BUILD" -DTINYWEBSERVER_ENABLE_REDIS=ON -DCMAKE_BUILD_TYPE=Release || exit 1
     cmake --build "$BUILD" -j"$(nproc)" || exit 1
     echo "  编译完成"
 else
@@ -86,8 +84,9 @@ ss -ltn 2>/dev/null | grep -E ':(9006|50051|50052|50053|50054)' | sort
 
 echo ""
 echo "=== 健康检查 ==="
-curl -s -o /dev/null -w "  gateway  /api/health : HTTP %{http_code}\n" http://127.0.0.1:9006/api/health
-curl -s -o /dev/null -w "  gateway  /api/books   : HTTP %{http_code}\n" http://127.0.0.1:9006/api/books
+curl -s -o /dev/null -w "  gateway  /api/live  : HTTP %{http_code}\n" http://127.0.0.1:9006/api/live
+curl -s -o /dev/null -w "  gateway  /api/ready : HTTP %{http_code}\n" http://127.0.0.1:9006/api/ready
+curl -s -o /dev/null -w "  gateway  /api/books : HTTP %{http_code}\n" http://127.0.0.1:9006/api/books
 
 echo ""
 echo "日志目录: $LOG_DIR"

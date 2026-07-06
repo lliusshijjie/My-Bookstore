@@ -41,6 +41,58 @@ Response `200 OK`:
 }
 ```
 
+### GET /api/live
+
+Kubernetes and Docker liveness probe for the gateway process. This endpoint
+does not check downstream dependencies.
+
+Response `200 OK`:
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "service": "web-gateway",
+    "status": "alive"
+  }
+}
+```
+
+### GET /api/ready
+
+Readiness probe for traffic routing. The gateway checks MySQL with `SELECT 1`.
+When the binary was compiled with Redis support and `REDIS_URL` is set, it also
+checks Redis with `PING`.
+
+Response `200 OK`:
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "service": "web-gateway",
+    "status": "ready",
+    "detail": "dependencies ready"
+  }
+}
+```
+
+Response `503 Service Unavailable`:
+
+```json
+{
+  "code": 1,
+  "message": "not_ready",
+  "data": {
+    "service": "web-gateway",
+    "status": "not_ready",
+    "detail": "mysql unavailable"
+  }
+}
+```
+
 ## Phase 2 Implemented Endpoints
 
 The gateway calls `UserClient`, `BookClient`, `InventoryClient`, and
@@ -260,6 +312,8 @@ The current gRPC boundaries are:
 
 Set `USER_GRPC_TARGET`, `BOOK_GRPC_TARGET`, `INVENTORY_GRPC_TARGET`, and
 `ORDER_GRPC_TARGET` to route gateway calls to remote services.
+Set `REDIS_URL=tcp://127.0.0.1:6379` to enable the Redis credential cache in a
+binary built with `-DTINYWEBSERVER_ENABLE_REDIS=ON`.
 
 Run the Docker-based inventory gRPC closure test with:
 

@@ -44,6 +44,12 @@ target_include_directories(test_static_root PRIVATE ${TEST_INCLUDE_DIR})
 target_compile_features(test_static_root PRIVATE cxx_std_17)
 add_test(NAME static_root COMMAND test_static_root)
 
+# --- test_deploy_runtime_contracts ---
+add_executable(test_deploy_runtime_contracts test_deploy_runtime_contracts.cpp)
+target_include_directories(test_deploy_runtime_contracts PRIVATE ${TEST_INCLUDE_DIR})
+target_compile_features(test_deploy_runtime_contracts PRIVATE cxx_std_17)
+add_test(NAME deploy_runtime_contracts COMMAND test_deploy_runtime_contracts)
+
 # --- test_book_catalog ---
 add_executable(test_book_catalog test_book_catalog.cpp)
 target_link_recommend_index(test_book_catalog)

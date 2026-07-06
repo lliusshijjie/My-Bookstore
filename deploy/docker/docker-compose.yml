@@ -57,6 +57,11 @@ services:
     command: ["0.0.0.0:50051"]
     ports:
       - "${INVENTORY_GRPC_PORT:-50051}:50051"
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/127.0.0.1/50051'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   server:
     image: tinywebserver-app:latest
@@ -71,13 +76,13 @@ services:
       redis:
         condition: service_healthy
       inventory-service:
-        condition: service_started
+        condition: service_healthy
       user-service:
-        condition: service_started
+        condition: service_healthy
       book-service:
-        condition: service_started
+        condition: service_healthy
       order-service:
-        condition: service_started
+        condition: service_healthy
     environment:
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
@@ -89,8 +94,9 @@ services:
       ORDER_GRPC_TARGET: order-service:50052
       USER_GRPC_TARGET: user-service:50053
       BOOK_GRPC_TARGET: book-service:50054
-    ports:
-      - "${SERVER_PORT:-9006}:9006"
+    # 仅内网暴露，由 nginx 反代到 https
+    expose:
+      - "9006"
     command:
       - "-p"
       - "9006"
@@ -102,6 +108,33 @@ services:
       - "8"
       - "-s"
       - "8"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9006/api/ready >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 对外 https 入口；内部回源 http://server:9006
+  # 启动前先生成证书: bash deploy/docker/nginx/generate-cert.sh
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: tinywebserver-nginx
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_healthy
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 
   order-service:
     image: tinywebserver-app:latest
@@ -114,9 +147,9 @@ services:
       mysql:
         condition: service_healthy
       inventory-service:
-        condition: service_started
+        condition: service_healthy
       book-service:
-        condition: service_started
+        condition: service_healthy
     environment:
       ORDER_DB_HOST: mysql
       ORDER_DB_PORT: 3306
@@ -130,6 +163,11 @@ services:
     command: ["0.0.0.0:50052"]
     ports:
       - "${ORDER_GRPC_PORT:-50052}:50052"
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/127.0.0.1/50052'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   user-service:
     image: tinywebserver-app:latest
@@ -152,6 +190,11 @@ services:
     command: ["0.0.0.0:50053"]
     ports:
       - "${USER_GRPC_PORT:-50053}:50053"
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/127.0.0.1/50053'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   book-service:
     image: tinywebserver-app:latest
@@ -174,6 +217,11 @@ services:
     command: ["0.0.0.0:50054"]
     ports:
       - "${BOOK_GRPC_PORT:-50054}:50054"
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/127.0.0.1/50054'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   mysql_data:

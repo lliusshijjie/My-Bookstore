@@ -32,6 +32,7 @@ RUN cmake -B build \
 FROM ubuntu:22.04 AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
         libmysqlclient21 \
         libgrpc++1 \
         libprotobuf23 \

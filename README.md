@@ -15,6 +15,7 @@ flowchart LR
     InventorySvc["Inventory gRPC\n:50051"]
     OrderSvc["Order gRPC\n:50052"]
     MySQL[("MySQL qgydb")]
+    Redis[("Redis credential cache")]
 
     Client -->|"HTTP /api/*"| Gateway
     Gateway --> Search
@@ -23,6 +24,7 @@ flowchart LR
     Gateway --> BookSvc
     Gateway --> InventorySvc
     Gateway --> OrderSvc
+    Gateway --> Redis
     OrderSvc --> BookSvc
     OrderSvc --> InventorySvc
 
@@ -59,6 +61,17 @@ sudo apt-get install -y cmake g++ libmysqlclient-dev libgrpc++-dev \
   libprotobuf-dev pkg-config protobuf-compiler protobuf-compiler-grpc
 ```
 
+Redis login caching is optional at compile time. Enable it only when hiredis
+and redis-plus-plus are installed:
+
+```bash
+cmake -S . -B build -DBUILD_TESTS=ON -DTINYWEBSERVER_ENABLE_REDIS=ON
+```
+
+The GitHub Actions Redis job builds redis-plus-plus from source; local Ubuntu
+22.04 environments can also use `libhiredis-dev libredis-plus-plus-dev` when
+available.
+
 Build and run tests:
 
 ```bash
@@ -81,7 +94,7 @@ Start the full service chain with Docker Compose:
 
 ```bash
 cd deploy/docker
-docker compose up -d --build mysql user-service book-service inventory-service order-service server
+docker compose up -d --build mysql redis user-service book-service inventory-service order-service server
 ```
 
 Open `http://localhost:9006/index.html`.
@@ -100,6 +113,7 @@ export USER_GRPC_TARGET=127.0.0.1:50053
 export BOOK_GRPC_TARGET=127.0.0.1:50054
 export INVENTORY_GRPC_TARGET=127.0.0.1:50051
 export ORDER_GRPC_TARGET=127.0.0.1:50052
+export REDIS_URL=tcp://127.0.0.1:6379
 ```
 
 ## HTTP API
@@ -108,6 +122,8 @@ Responses use `{"code":0,"message":"ok","data":...}`. See [docs/ecommerce_api.md
 
 ```text
 GET  /api/health
+GET  /api/live
+GET  /api/ready
 POST /api/auth/register
 POST /api/auth/login
 GET  /api/books
@@ -126,4 +142,9 @@ POST /api/orders/{order_id}/cancel
 
 ## CI
 
-GitHub Actions runs on pushes and pull requests. The workflow installs C++/MySQL/gRPC/Protobuf dependencies, configures CMake with tests, builds all targets, validates Protobuf contracts, runs CTest, checks gRPC stub generation, and verifies the Makefile server build.
+GitHub Actions runs on pushes and pull requests. The default job installs
+C++/MySQL/gRPC/Protobuf dependencies, configures CMake with tests, builds all
+targets, validates Protobuf contracts, runs CTest, checks gRPC stub generation,
+and verifies the Makefile server build. A second job starts Redis, enables
+`TINYWEBSERVER_ENABLE_REDIS=ON`, builds the Redis credential-cache path, and
+runs the Redis-aware CTest suite.
