@@ -41,3 +41,7 @@ tools/webbench-1.5/tags
 
 # TLS 证书（本地自签或正式证书，不入库）
 deploy/docker/nginx/certs/
+
+# AI Agent 相关
+CLAUDE.md
+Agent.md

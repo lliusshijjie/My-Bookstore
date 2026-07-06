@@ -8,7 +8,16 @@ TinyWebServer is evolving into a C++17 bookstore backend. The project keeps the 
 flowchart LR
     Browser["Browser\nHTTPS :443"]
     Nginx["Nginx reverse proxy\nTLS :443 / redirect :80"]
-    Gateway["Web Gateway\nHTTP JSON :9006\ninternal Docker network"]
+    Listen["listen socket\n0.0.0.0:9006"]
+    Epoll["epoll event loop\nepoll_wait"]
+    Accept["accept + HttpConn::init\nnonblocking + EPOLLONESHOT"]
+    Timer["timer list\nidle timeout cleanup"]
+    ConnEvent["connection event\nEPOLLIN / EPOLLOUT"]
+    ThreadPool["threadpool<http_conn>\nrequest queue"]
+    Workers["worker threads\nReactor I/O + process\nor Proactor process"]
+    HttpConn["HttpConn\nread_once / parse HTTP\nprocess_write / writev"]
+    Dispatch{"/api/* ?"}
+    Gateway["ApiGateway\nHTTP JSON handlers"]
     Client["client/\nStatic browser assets"]
     Search["Book Search\n/api/books/search"]
     Recommend["Recommend Index\n/api/books/{id}/similar"]
@@ -20,8 +29,20 @@ flowchart LR
     Redis[("Redis credential cache")]
 
     Browser -->|"HTTPS /"| Nginx
-    Nginx -->|"HTTP upstream\nserver:9006"| Gateway
-    Gateway -->|"serves static files"| Client
+    Nginx -->|"HTTP upstream\nserver:9006"| Listen
+    Listen --> Epoll
+    Epoll -->|"listenfd ready"| Accept
+    Accept --> Timer
+    Accept -->|"register connfd"| Epoll
+    Epoll -->|"connfd ready"| ConnEvent
+    ConnEvent -->|"append / append_p"| ThreadPool
+    ThreadPool --> Workers
+    Workers --> HttpConn
+    HttpConn --> Dispatch
+    Dispatch -->|"yes"| Gateway
+    Dispatch -->|"no"| Client
+    HttpConn -->|"HTTP response"| Nginx
+
     Gateway --> Search
     Gateway --> Recommend
     Gateway --> UserSvc
